@@ -2,6 +2,12 @@
 
 Pin your Mac's Dock to specific displays and prevent it from jumping between screens.
 
+<p align="center">
+  <img src="docs/screenshot-menu.png" alt="DockPin menu" height="260">
+  <img src="docs/screenshot-allow.png" alt="Display selection" height="260">
+  <img src="docs/screenshot-modifier.png" alt="Modifier key override" height="260">
+</p>
+
 ## Features
 
 - Lock the Dock to selected displays

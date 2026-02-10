@@ -160,6 +160,61 @@
     animation: fadeUp 0.8s ease 0.4s forwards;
   }
 
+  /* ── Screenshots ── */
+  .screenshots {
+    padding: 16px 0 48px;
+    opacity: 0;
+    animation: fadeUp 0.8s ease 0.35s forwards;
+  }
+
+  .screenshots .section-title {
+    animation-delay: 0.35s;
+  }
+
+  .screenshot-track {
+    display: flex;
+    gap: 20px;
+    overflow-x: auto;
+    padding: 8px 0 20px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .screenshot-track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .screenshot-card {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    position: relative;
+  }
+
+  .screenshot-card img {
+    display: block;
+    height: 280px;
+    width: auto;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .screenshot-card img:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(59, 124, 245, 0.15);
+  }
+
+  .screenshot-label {
+    display: block;
+    margin-top: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    text-align: center;
+    letter-spacing: 0.3px;
+  }
+
   /* ── Features ── */
   .features {
     display: grid;
@@ -254,6 +309,7 @@
     .features { grid-template-columns: 1fr; }
     .feature:nth-child(5) { grid-column: auto; }
     .reqs { flex-direction: column; }
+    .screenshot-card img { height: 220px; }
   }
 </style>
 </head>
@@ -273,6 +329,24 @@
         Download for Mac
       </a>
       <span id="version" class="version"></span>
+    </div>
+  </section>
+
+  <section class="screenshots">
+    <div class="section-title">Screenshots</div>
+    <div class="screenshot-track">
+      <div class="screenshot-card">
+        <img src="screenshot-menu.png" alt="DockPin menu bar dropdown">
+        <span class="screenshot-label">Menu bar controls</span>
+      </div>
+      <div class="screenshot-card">
+        <img src="screenshot-allow.png" alt="Allow Dock on Display submenu">
+        <span class="screenshot-label">Display selection</span>
+      </div>
+      <div class="screenshot-card">
+        <img src="screenshot-modifier.png" alt="Override Modifier Key submenu">
+        <span class="screenshot-label">Modifier key override</span>
+      </div>
     </div>
   </section>
 
