@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DockPin — Pin Your Dock</title>
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --surface: #141418;
+    --border: #1f1f26;
+    --text: #e8e8ed;
+    --text-dim: #6e6e7a;
+    --accent: #3b7cf5;
+    --accent-glow: rgba(59, 124, 245, 0.15);
+    --radius: 16px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Ambient background ── */
+  .ambient {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .ambient::before {
+    content: '';
+    position: absolute;
+    width: 800px;
+    height: 800px;
+    top: -300px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: radial-gradient(circle, rgba(59, 124, 245, 0.08) 0%, transparent 70%);
+    animation: pulse 8s ease-in-out infinite alternate;
+  }
+  @keyframes pulse {
+    0% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+    100% { opacity: 1; transform: translateX(-50%) scale(1.15); }
+  }
+
+  /* ── Layout ── */
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 80px 24px 60px;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    text-align: center;
+    padding-bottom: 64px;
+  }
+
+  .icon {
+    width: 160px;
+    height: 160px;
+    border-radius: 36px;
+    margin-bottom: 32px;
+    opacity: 0;
+    animation: fadeUp 0.8s ease forwards;
+    filter: drop-shadow(0 12px 40px rgba(59, 124, 245, 0.2));
+  }
+
+  h1 {
+    font-size: 52px;
+    font-weight: 700;
+    letter-spacing: -1.5px;
+    line-height: 1;
+    margin-bottom: 16px;
+    opacity: 0;
+    animation: fadeUp 0.8s ease 0.1s forwards;
+  }
+
+  .tagline {
+    font-size: 19px;
+    font-weight: 400;
+    color: var(--text-dim);
+    line-height: 1.55;
+    max-width: 480px;
+    margin: 0 auto 40px;
+    opacity: 0;
+    animation: fadeUp 0.8s ease 0.2s forwards;
+  }
+
+  /* ── Download button ── */
+  .download-wrap {
+    opacity: 0;
+    animation: fadeUp 0.8s ease 0.3s forwards;
+  }
+
+  .download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 36px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    background: var(--accent);
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 4px 24px rgba(59, 124, 245, 0.3);
+  }
+  .download-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(59, 124, 245, 0.4);
+  }
+  .download-btn:active {
+    transform: translateY(0);
+  }
+  .download-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+  }
+
+  .version {
+    display: block;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 0.3px;
+  }
+
+  /* ── Sections ── */
+  .section {
+    padding: 48px 0;
+  }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 28px;
+    opacity: 0;
+    animation: fadeUp 0.8s ease 0.4s forwards;
+  }
+
+  /* ── Features ── */
+  .features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .feature {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards;
+  }
+  .feature:nth-child(1) { animation-delay: 0.45s; }
+  .feature:nth-child(2) { animation-delay: 0.5s; }
+  .feature:nth-child(3) { animation-delay: 0.55s; }
+  .feature:nth-child(4) { animation-delay: 0.6s; }
+  .feature:nth-child(5) { animation-delay: 0.65s; grid-column: 1 / -1; }
+
+  .feature-icon {
+    font-size: 22px;
+    margin-bottom: 12px;
+    display: block;
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+    text-align: center;
+    background: var(--accent-glow);
+    border-radius: 10px;
+  }
+
+  .feature-text {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.45;
+  }
+
+  /* ── Requirements ── */
+  .reqs {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .reqs li {
+    font-size: 14px;
+    color: var(--text-dim);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 10px 20px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards;
+  }
+  .reqs li:nth-child(1) { animation-delay: 0.7s; }
+  .reqs li:nth-child(2) { animation-delay: 0.75s; }
+  .reqs li:nth-child(3) { animation-delay: 0.8s; }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    padding: 48px 0 32px;
+    font-size: 13px;
+    color: var(--text-dim);
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.85s forwards;
+  }
+  footer a {
+    color: var(--text-dim);
+    text-decoration: none;
+    border-bottom: 1px solid var(--border);
+    transition: color 0.2s;
+  }
+  footer a:hover { color: var(--text); }
+
+  /* ── Animations ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    .page { padding: 56px 20px 40px; }
+    h1 { font-size: 38px; }
+    .tagline { font-size: 17px; }
+    .icon { width: 120px; height: 120px; border-radius: 28px; }
+    .features { grid-template-columns: 1fr; }
+    .feature:nth-child(5) { grid-column: auto; }
+    .reqs { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="ambient"></div>
+
+<div class="page">
+
+  <section class="hero">
+    <img src="icon.png" alt="DockPin" class="icon">
+    <h1>DockPin</h1>
+    <p class="tagline">Pin your Mac's Dock to specific displays and prevent it from jumping between screens.</p>
+    <div class="download-wrap">
+      <a id="download" class="download-btn" href="https://github.com/green2grey/DockPin/releases/latest">
+        <svg viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 2h14v2H5v-2z"/></svg>
+        Download for Mac
+      </a>
+      <span id="version" class="version"></span>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-title">Features</div>
+    <div class="features">
+      <div class="feature">
+        <span class="feature-icon">&#x1F512;</span>
+        <div class="feature-text">Lock the Dock to selected displays</div>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">&#x1F5A5;</span>
+        <div class="feature-text">Allow or disallow specific monitors</div>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">&#x2325;</span>
+        <div class="feature-text">Override locking with a modifier key</div>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">&#x26A1;</span>
+        <div class="feature-text">Launch at startup with persistent settings</div>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">&#x25CB;</span>
+        <div class="feature-text">Lightweight menu bar app &mdash; no Dock icon, runs silently in the background</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-title">Requirements</div>
+    <ul class="reqs">
+      <li>macOS 13 or later</li>
+      <li>Two or more displays</li>
+      <li>Dock at the bottom of the screen</li>
+    </ul>
+  </section>
+
+  <footer>
+    Made by <a href="https://github.com/green2grey">green2grey</a>
+  </footer>
+
+</div>
+
+<script>
+  fetch('https://api.github.com/repos/green2grey/DockPin/releases/latest')
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(data => {
+      const btn = document.getElementById('download');
+      const ver = document.getElementById('version');
+      if (data.assets && data.assets.length > 0) {
+        btn.href = data.assets[0].browser_download_url;
+      }
+      if (data.tag_name) {
+        ver.textContent = data.tag_name + ' \u00B7 macOS';
+      }
+    })
+    .catch(() => {
+      document.getElementById('version').textContent = 'macOS';
+    });
+</script>
+
+</body>
+</html>
