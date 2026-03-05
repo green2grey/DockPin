@@ -1,0 +1,4 @@
+build/
+.DS_Store
+*.iconset/
+generate_icon.swift
