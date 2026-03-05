@@ -3,7 +3,7 @@ import CoreGraphics
 
 // MARK: - Modifier key override option
 
-enum ModifierOption: Int, CaseIterable {
+enum ModifierOption: Int, CaseIterable, Codable, Sendable {
     case none    = 0
     case option  = 1
     case control = 2
@@ -59,24 +59,6 @@ final class DockMonitor {
     fileprivate var blockedScreens: [ScreenBounds] = []
     fileprivate var overrideFlag: CGEventFlags? = CGEventFlags.maskAlternate
 
-    // MARK: - Persistence
-
-    func saveState() {
-        let ids = allowedDisplays.map { Int($0) }
-        UserDefaults.standard.set(ids, forKey: "allowedDisplays")
-        UserDefaults.standard.set(isEnabled, forKey: "isEnabled")
-        UserDefaults.standard.set(overrideModifier.rawValue, forKey: "overrideModifier")
-    }
-
-    func restoreState() {
-        if let ids = UserDefaults.standard.array(forKey: "allowedDisplays") as? [Int] {
-            allowedDisplays = Set(ids.map { CGDirectDisplayID($0) })
-        }
-        isEnabled = UserDefaults.standard.bool(forKey: "isEnabled")
-        overrideModifier = ModifierOption(rawValue: UserDefaults.standard.integer(forKey: "overrideModifier")) ?? .option
-        overrideFlag = overrideModifier.cgFlag
-    }
-
     // MARK: - Public
 
     /// Returns `true` if locking started successfully, `false` if the event tap failed.
@@ -102,8 +84,9 @@ final class DockMonitor {
     func refreshScreenCache() {
         let primaryH = CGDisplayBounds(CGMainDisplayID()).height
         blockedScreens = NSScreen.screens
-            .filter { !allowedDisplays.contains($0.displayID) }
-            .map { s in
+            .compactMap { s -> ScreenBounds? in
+                guard let displayID = s.dockPinDisplayID else { return nil }
+                guard !allowedDisplays.contains(displayID) else { return nil }
                 let f = s.frame
                 return ScreenBounds(
                     cgLeft:   f.minX,
@@ -184,15 +167,6 @@ final class DockMonitor {
         return Unmanaged.passUnretained(event)
     }
 
-    // MARK: - Helpers
-
-    /// Detect which screen currently hosts the Dock (bottom-positioned only).
-    static func currentDockScreen() -> NSScreen? {
-        NSScreen.screens.first { screen in
-            let gap = screen.visibleFrame.minY - screen.frame.minY
-            return gap > 10
-        }
-    }
 }
 
 // MARK: - C callback (no captures)

@@ -4,16 +4,26 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DockPin — Pin Your Dock</title>
+<meta name="description" content="Keep your Mac's Dock exactly where you want it. DockPin locks the Dock to specific displays and switches automatically when your setup changes.">
+<meta property="og:title" content="DockPin — Pin Your Dock">
+<meta property="og:description" content="Keep your Mac's Dock exactly where you want it. Locks the Dock to specific displays with automatic profile switching.">
+<meta property="og:image" content="https://green2grey.github.io/DockPin/icon.png">
+<meta property="og:url" content="https://green2grey.github.io/DockPin/">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/png" href="icon.png">
 <style>
   :root {
-    --bg: #0a0a0c;
-    --surface: #141418;
-    --border: #1f1f26;
-    --text: #e8e8ed;
-    --text-dim: #6e6e7a;
-    --accent: #3b7cf5;
-    --accent-glow: rgba(59, 124, 245, 0.15);
-    --radius: 16px;
+    --bg: #f0f0e8;
+    --text: #1a1a1a;
+    --muted: #888;
+    --accent: #2d5a2d;
+    --accent-hover: #3a6a3a;
+    --highlight: #7cb87c;
+    --border: #1a1a1a;
+    --border-subtle: #ccc;
+    --inv: #1a1a1a;
+    --inv-text: #f0f0e8;
+    --mono: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -23,381 +33,1103 @@
     background: var(--bg);
     color: var(--text);
     -webkit-font-smoothing: antialiased;
-    scroll-behavior: smooth;
   }
 
-  body {
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
+  body { min-height: 100vh; }
 
-  /* ── Ambient background ── */
-  .ambient {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    overflow: hidden;
+  /* ── Topbar ── */
+  .topbar {
+    border-bottom: 2px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
-  .ambient::before {
-    content: '';
-    position: absolute;
-    width: 800px;
-    height: 800px;
-    top: -300px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: radial-gradient(circle, rgba(59, 124, 245, 0.08) 0%, transparent 70%);
-    animation: pulse 8s ease-in-out infinite alternate;
+  .topbar-name {
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
   }
-  @keyframes pulse {
-    0% { opacity: 0.6; transform: translateX(-50%) scale(1); }
-    100% { opacity: 1; transform: translateX(-50%) scale(1.15); }
+  .topbar-links {
+    display: flex;
+    gap: 24px;
+    font-size: 13px;
   }
-
-  /* ── Layout ── */
-  .page {
-    position: relative;
-    z-index: 1;
-    max-width: 720px;
-    margin: 0 auto;
-    padding: 80px 24px 60px;
+  .topbar-links a {
+    color: var(--text);
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
+  .topbar-links a:hover { color: var(--accent); }
 
   /* ── Hero ── */
   .hero {
-    text-align: center;
-    padding-bottom: 64px;
-  }
-
-  .icon {
-    width: 160px;
-    height: 160px;
-    border-radius: 36px;
-    margin-bottom: 32px;
-    opacity: 0;
-    animation: fadeUp 0.8s ease forwards;
-    filter: drop-shadow(0 12px 40px rgba(59, 124, 245, 0.2));
-  }
-
-  h1 {
-    font-size: 52px;
-    font-weight: 700;
-    letter-spacing: -1.5px;
-    line-height: 1;
-    margin-bottom: 16px;
-    opacity: 0;
-    animation: fadeUp 0.8s ease 0.1s forwards;
-  }
-
-  .tagline {
-    font-size: 19px;
-    font-weight: 400;
-    color: var(--text-dim);
-    line-height: 1.55;
-    max-width: 480px;
-    margin: 0 auto 40px;
-    opacity: 0;
-    animation: fadeUp 0.8s ease 0.2s forwards;
-  }
-
-  /* ── Download button ── */
-  .download-wrap {
-    opacity: 0;
-    animation: fadeUp 0.8s ease 0.3s forwards;
-  }
-
-  .download-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    padding: 16px 36px;
-    font-size: 16px;
-    font-weight: 600;
-    color: #fff;
-    background: var(--accent);
-    border: none;
-    border-radius: 12px;
-    cursor: pointer;
-    text-decoration: none;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    box-shadow: 0 4px 24px rgba(59, 124, 245, 0.3);
-  }
-  .download-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 32px rgba(59, 124, 245, 0.4);
-  }
-  .download-btn:active {
-    transform: translateY(0);
-  }
-  .download-btn svg {
-    width: 18px;
-    height: 18px;
-    fill: currentColor;
-  }
-
-  .version {
-    display: block;
-    margin-top: 12px;
-    font-size: 13px;
-    color: var(--text-dim);
-    letter-spacing: 0.3px;
-  }
-
-  /* ── Sections ── */
-  .section {
-    padding: 48px 0;
-  }
-
-  .section-title {
-    font-size: 13px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: var(--text-dim);
-    margin-bottom: 28px;
-    opacity: 0;
-    animation: fadeUp 0.8s ease 0.4s forwards;
-  }
-
-  /* ── Screenshots ── */
-  .screenshots {
-    padding: 16px 0 48px;
-    opacity: 0;
-    animation: fadeUp 0.8s ease 0.35s forwards;
-  }
-
-  .screenshots .section-title {
-    animation-delay: 0.35s;
-  }
-
-  .screenshot-track {
-    display: flex;
-    justify-content: center;
-    gap: 16px;
-    padding: 8px 0 20px;
-  }
-
-  .screenshot-card {
+    padding: 80px 24px 0;
+    max-width: 960px;
+    margin: 0 auto;
     position: relative;
   }
-
-  .screenshot-card img {
-    display: block;
-    height: 180px;
-    width: auto;
-    border-radius: 10px;
-    border: 1px solid var(--border);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  .hero-icon {
+    width: 96px;
+    height: 96px;
+    margin-bottom: 48px;
+  }
+  h1 {
+    font-size: clamp(60px, 11vw, 110px);
+    font-weight: 900;
+    letter-spacing: -4px;
+    line-height: 0.9;
+    margin-bottom: 28px;
+  }
+  h1 .accent { color: var(--accent); }
+  .tagline {
+    font-size: 20px;
+    font-weight: 400;
+    color: var(--muted);
+    line-height: 1.5;
+    max-width: 460px;
+    margin-bottom: 48px;
   }
 
-  .screenshot-card img:hover {
-    transform: translateY(-3px) scale(1.02);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(59, 124, 245, 0.15);
+  /* ── Hero animation band ── */
+  .hero-anim-band {
+    background: var(--inv);
+    border-top: 2px solid var(--border);
+    border-bottom: 2px solid var(--border);
+    padding: 32px 0;
+    margin-top: 64px;
   }
-
-  .screenshot-label {
+  .hero-anim-band svg {
     display: block;
-    margin-top: 8px;
+    width: 100%;
+    max-width: 720px;
+    height: auto;
+    margin: 0 auto;
+  }
+  .download-btn {
+    display: inline-block;
+    padding: 18px 44px;
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--inv-text);
+    background: var(--accent);
+    border: 2px solid var(--accent);
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .download-btn:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+  .download-meta {
+    display: block;
+    margin-top: 14px;
+    font-family: var(--mono);
     font-size: 11px;
-    font-weight: 500;
-    color: var(--text-dim);
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Section utilities ── */
+  .section-label {
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    color: var(--muted);
+    margin-bottom: 28px;
+  }
+
+  /* ── Demo ── */
+  .demo-section {
+    padding: 64px 24px 72px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  .demo-frame {
+    border: 2px solid var(--border);
+    background: var(--inv);
+    position: relative;
+    overflow: visible;
+  }
+
+  /* Menu bar */
+  .demo-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 26px;
+    padding: 0 12px;
+    background: #0a0a0a;
+    border-bottom: 1px solid #2a2a2a;
+    user-select: none;
+  }
+  .demo-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #e0e0e0;
+  }
+  .demo-bar-left span:first-child { font-weight: 900; }
+  .demo-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #888;
+    font-size: 12px;
+  }
+  .demo-bar-right .bar-time {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: #999;
+    margin-left: 4px;
+  }
+  .demo-bar-trigger {
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    opacity: 0.65;
+    transition: opacity 0.15s;
+  }
+  .demo-bar-trigger:hover, .demo-bar-trigger.active { opacity: 1; }
+
+  /* Displays */
+  .demo-canvas {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 10px;
+    padding: 52px 32px 20px;
+  }
+  .demo-monitor {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .demo-display {
+    position: relative;
+    background: #0e0e0e;
+    border: 2px solid #333;
+    overflow: hidden;
+    transition: border-color 0.35s;
+  }
+  .demo-display.allowed { border-color: var(--highlight); }
+  .demo-display.glow { border-color: #fff; }
+  .demo-display--ext { width: 220px; height: 148px; }
+  .demo-display--int { width: 174px; height: 118px; }
+  .demo-display-label {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.8px;
+    color: #444;
+    text-transform: uppercase;
+    transition: color 0.3s;
+  }
+  .demo-display.allowed .demo-display-label { color: #666; }
+  .demo-display-state {
+    position: absolute;
+    bottom: 8px;
+    right: 10px;
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #333;
+    transition: color 0.3s;
+  }
+  .demo-display.allowed .demo-display-state { color: var(--highlight); }
+
+  /* Dock bar */
+  .demo-dock {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border-top: 1px solid transparent;
+    opacity: 0;
+    transform: translateY(100%);
+    transition: opacity 0.4s ease, transform 0.4s ease, border-color 0.3s;
+  }
+  .demo-display.has-dock .demo-dock {
+    opacity: 1;
+    transform: translateY(0);
+    border-top-color: var(--accent);
+  }
+  .dock-pip {
+    width: 7px;
+    height: 7px;
+    transition: opacity 0.3s;
+  }
+
+  /* Stand */
+  .demo-stand {
+    width: 28px;
+    height: 3px;
+    background: #333;
+    margin-top: 5px;
+  }
+  .demo-stand--wide { width: 50px; }
+
+  /* Status bar */
+  .demo-status {
+    border-top: 1px solid #2a2a2a;
+    padding: 10px 16px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    color: #555;
+    background: #0a0a0a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .demo-status-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--highlight);
+    flex-shrink: 0;
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  .demo-status-dot.off { background: #444; animation: none; }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* Dropdown menu */
+  .demo-menu {
+    position: absolute;
+    top: 26px;
+    right: 10px;
+    width: 232px;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    color: var(--text);
+    padding: 4px 0;
+    display: none;
+    z-index: 20;
+    font-size: 13px;
+  }
+  .demo-menu.open { display: block; }
+  .demo-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    cursor: default;
+    position: relative;
+    white-space: nowrap;
+    transition: background 0.08s, color 0.08s;
+  }
+  .demo-item:hover {
+    background: var(--accent);
+    color: var(--inv-text);
+  }
+  .demo-item-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .demo-check {
+    width: 14px;
     text-align: center;
+    font-weight: 900;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+  .demo-arrow {
+    font-size: 10px;
+    opacity: 0.4;
+    margin-left: 8px;
+  }
+  .demo-sep {
+    height: 1px;
+    background: var(--border-subtle);
+    margin: 3px 10px;
+  }
+  .demo-header {
+    padding: 6px 14px;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    cursor: default;
+  }
+  .demo-toggle {
+    display: inline-block;
+    width: 30px;
+    height: 16px;
+    border: 2px solid var(--border);
+    position: relative;
+    vertical-align: middle;
+    cursor: pointer;
+    background: var(--bg);
+    transition: background 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+  }
+  .demo-toggle.on {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .demo-toggle::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 8px;
+    height: 8px;
+    background: var(--text);
+    transition: transform 0.15s;
+  }
+  .demo-toggle.on::after {
+    transform: translateX(14px);
+    background: var(--inv-text);
+  }
+
+  /* Submenus */
+  .demo-submenu {
+    position: absolute;
+    right: calc(100% + 4px);
+    top: -6px;
+    width: 200px;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    color: var(--text);
+    padding: 4px 0;
+    display: none;
+    z-index: 21;
+  }
+  .demo-has-sub:hover > .demo-submenu { display: block; }
+
+  /* Toast */
+  .demo-toast {
+    position: absolute;
+    bottom: 52px;
+    left: 50%;
+    transform: translateX(-50%) translateY(6px);
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 8px 20px;
+    border: 2px solid var(--border);
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 30;
+  }
+  .demo-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .demo-hint {
+    text-align: center;
+    margin-top: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
     letter-spacing: 0.3px;
+  }
+
+  /* ── How it works ── */
+  .how-it-works {
+    background: var(--inv);
+    color: var(--inv-text);
+    padding: 72px 24px;
+    border-top: 2px solid var(--border);
+  }
+  .how-inner {
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  .how-it-works .section-label { color: var(--highlight); }
+  .steps-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .step {
+    padding: 32px 28px;
+    border-left: 2px solid #2a2a2a;
+  }
+  .step:first-child { border-left: none; padding-left: 0; }
+  .step-num {
+    font-family: var(--mono);
+    font-size: 52px;
+    font-weight: 900;
+    color: var(--highlight);
+    line-height: 1;
+    margin-bottom: 20px;
+  }
+  .step-title {
+    font-size: 16px;
+    font-weight: 900;
+    margin-bottom: 8px;
+  }
+  .step-desc {
+    font-size: 13px;
+    color: #777;
+    line-height: 1.5;
   }
 
   /* ── Features ── */
-  .features {
+  .features-section {
+    padding: 72px 24px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  .features-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
   }
-
   .feature {
-    background: var(--surface);
+    padding: 32px;
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 24px;
-    opacity: 0;
-    animation: fadeUp 0.6s ease forwards;
+    margin-top: -1px;
+    margin-left: -1px;
+    position: relative;
   }
-  .feature:nth-child(1) { animation-delay: 0.45s; }
-  .feature:nth-child(2) { animation-delay: 0.5s; }
-  .feature:nth-child(3) { animation-delay: 0.55s; }
-  .feature:nth-child(4) { animation-delay: 0.6s; }
-  .feature:nth-child(5) { animation-delay: 0.65s; grid-column: 1 / -1; }
-
-  .feature-icon {
-    font-size: 22px;
+  .feature-num {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
     margin-bottom: 12px;
-    display: block;
-    width: 40px;
-    height: 40px;
-    line-height: 40px;
-    text-align: center;
-    background: var(--accent-glow);
-    border-radius: 10px;
+  }
+  .feature-title {
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+  .feature-desc {
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.6;
   }
 
-  .feature-text {
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--text);
-    line-height: 1.45;
+  /* ── What's New ── */
+  .whats-new {
+    background: var(--inv);
+    color: var(--inv-text);
+    padding: 72px 24px;
+    border-top: 2px solid var(--border);
+  }
+  .whats-new-inner {
+    max-width: 960px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 56px;
+    align-items: start;
+  }
+  .whats-new-heading {
+    font-size: 52px;
+    font-weight: 900;
+    letter-spacing: -2px;
+    line-height: 0.95;
+  }
+  .whats-new-version {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--highlight);
+    display: block;
+    margin-top: 12px;
+    letter-spacing: 1.5px;
+  }
+  .whats-new ul { list-style: none; }
+  .whats-new li {
+    font-size: 16px;
+    line-height: 1.6;
+    padding: 14px 0;
+    border-bottom: 1px solid #2a2a2a;
+    color: #bbb;
+  }
+  .whats-new li:last-child { border-bottom: none; }
+  .whats-new li::before {
+    content: "\2014\00a0";
+    color: var(--highlight);
+    font-weight: 900;
   }
 
   /* ── Requirements ── */
-  .reqs {
-    list-style: none;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
+  .requirements {
+    padding: 48px 24px;
+    max-width: 960px;
+    margin: 0 auto;
+    border-top: 2px solid var(--border);
   }
-
-  .reqs li {
-    font-size: 14px;
-    color: var(--text-dim);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 100px;
-    padding: 10px 20px;
-    opacity: 0;
-    animation: fadeUp 0.6s ease forwards;
+  .requirements p {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 2.2;
+    letter-spacing: 0.3px;
   }
-  .reqs li:nth-child(1) { animation-delay: 0.7s; }
-  .reqs li:nth-child(2) { animation-delay: 0.75s; }
-  .reqs li:nth-child(3) { animation-delay: 0.8s; }
 
   /* ── Footer ── */
   footer {
-    text-align: center;
-    padding: 48px 0 32px;
+    border-top: 2px solid var(--border);
+    padding: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     font-size: 13px;
-    color: var(--text-dim);
-    opacity: 0;
-    animation: fadeUp 0.6s ease 0.85s forwards;
+    color: var(--muted);
   }
   footer a {
-    color: var(--text-dim);
-    text-decoration: none;
-    border-bottom: 1px solid var(--border);
-    transition: color 0.2s;
+    color: var(--text);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    transition: color 0.15s;
   }
-  footer a:hover { color: var(--text); }
+  footer a:hover { color: var(--accent); }
+  .footer-links { display: flex; gap: 24px; }
 
   /* ── Animations ── */
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(16px); }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(14px); }
     to   { opacity: 1; transform: translateY(0); }
   }
+  .hero, .hero-anim-band, .demo-section, .how-it-works, .features-section, .whats-new {
+    opacity: 0;
+    animation: fadeIn 0.5s ease forwards;
+  }
+  .hero-anim-band { animation-delay: 0.04s; }
+  .demo-section { animation-delay: 0.06s; }
+  .how-it-works { animation-delay: 0.1s; }
+  .features-section { animation-delay: 0.14s; }
+  .whats-new { animation-delay: 0.18s; }
 
   /* ── Responsive ── */
-  @media (max-width: 600px) {
-    .page { padding: 56px 20px 40px; }
-    h1 { font-size: 38px; }
+  @media (max-width: 700px) {
+    .topbar { padding: 12px 16px; }
+    .topbar-links { gap: 16px; }
+    .hero { padding: 52px 16px 0; }
+    .hero-anim-band { margin-top: 48px; padding: 20px 0; }
+    h1 { font-size: 52px; letter-spacing: -2px; }
     .tagline { font-size: 17px; }
-    .icon { width: 120px; height: 120px; border-radius: 28px; }
-    .features { grid-template-columns: 1fr; }
-    .feature:nth-child(5) { grid-column: auto; }
-    .reqs { flex-direction: column; }
+    .hero-icon { width: 72px; height: 72px; }
+    .demo-section { padding: 48px 16px 56px; }
+    .demo-canvas { padding: 36px 12px 16px; gap: 6px; }
+    .demo-display--ext { width: 130px; height: 90px; }
+    .demo-display--int { width: 110px; height: 75px; }
+    .demo-display-label { font-size: 7px; top: 6px; left: 6px; }
+    .demo-display-state { font-size: 7px; bottom: 5px; right: 6px; }
+    .demo-dock { height: 16px; }
+    .dock-pip { width: 5px; height: 5px; }
+    .demo-menu { width: 210px; right: 4px; }
+    .demo-submenu { right: calc(100% + 2px); width: 180px; }
+    .how-it-works { padding: 52px 16px; }
+    .steps-grid { grid-template-columns: 1fr; }
+    .step { border-left: none; border-top: 1px solid #2a2a2a; padding: 24px 0; }
+    .step:first-child { border-top: none; }
+    .step-num { font-size: 36px; }
+    .features-section { padding: 52px 16px; }
+    .features-grid { grid-template-columns: 1fr; }
+    .whats-new { padding: 52px 16px; }
+    .whats-new-inner { grid-template-columns: 1fr; gap: 24px; }
+    .whats-new-heading { font-size: 40px; }
+    .requirements { padding: 32px 16px; }
+    footer { flex-direction: column; gap: 12px; text-align: center; padding: 24px 16px; }
   }
 </style>
 </head>
 <body>
 
-<div class="ambient"></div>
+<div class="topbar">
+  <span class="topbar-name">DockPin</span>
+  <nav class="topbar-links">
+    <a href="https://github.com/green2grey/DockPin" target="_blank" rel="noopener noreferrer">Source</a>
+    <a href="https://github.com/green2grey/DockPin/releases/latest">Download</a>
+  </nav>
+</div>
 
-<div class="page">
+<section class="hero">
+  <img src="icon.png" alt="DockPin" class="hero-icon" width="96" height="96">
+  <h1>Pin your<br>Dock<span class="accent">.</span></h1>
+  <p class="tagline">Keep your Dock exactly where you want it &mdash; even when your displays change.</p>
+  <div>
+    <a id="download" class="download-btn" href="https://github.com/green2grey/DockPin/releases/latest">Download for Mac</a>
+    <span id="version" class="download-meta">v2.0 // macOS 13+ // 5 MB</span>
+  </div>
+</section>
 
-  <section class="hero">
-    <img src="icon.png" alt="DockPin" class="icon">
-    <h1>DockPin</h1>
-    <p class="tagline">Pin your Mac's Dock to specific displays and prevent it from jumping between screens.</p>
-    <div class="download-wrap">
-      <a id="download" class="download-btn" href="https://github.com/green2grey/DockPin/releases/latest">
-        <svg viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 2h14v2H5v-2z"/></svg>
-        Download for Mac
-      </a>
-      <span id="version" class="version"></span>
-    </div>
-  </section>
-
-  <section class="screenshots">
-    <div class="section-title">Screenshots</div>
-    <div class="screenshot-track">
-      <div class="screenshot-card">
-        <img src="screenshot-menu.png" alt="DockPin menu bar dropdown">
-        <span class="screenshot-label">Menu bar controls</span>
-      </div>
-      <div class="screenshot-card">
-        <img src="screenshot-allow.png" alt="Allow Dock on Display submenu">
-        <span class="screenshot-label">Display selection</span>
-      </div>
-      <div class="screenshot-card">
-        <img src="screenshot-modifier.png" alt="Override Modifier Key submenu">
-        <span class="screenshot-label">Modifier key override</span>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="section-title">Features</div>
-    <div class="features">
-      <div class="feature">
-        <span class="feature-icon">&#x1F512;</span>
-        <div class="feature-text">Lock the Dock to selected displays</div>
-      </div>
-      <div class="feature">
-        <span class="feature-icon">&#x1F5A5;</span>
-        <div class="feature-text">Allow or disallow specific monitors</div>
-      </div>
-      <div class="feature">
-        <span class="feature-icon">&#x2325;</span>
-        <div class="feature-text">Override locking with a modifier key</div>
-      </div>
-      <div class="feature">
-        <span class="feature-icon">&#x26A1;</span>
-        <div class="feature-text">Launch at startup with persistent settings</div>
-      </div>
-      <div class="feature">
-        <span class="feature-icon">&#x25CB;</span>
-        <div class="feature-text">Lightweight menu bar app &mdash; no Dock icon, runs silently in the background</div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="section-title">Requirements</div>
-    <ul class="reqs">
-      <li>macOS 13 or later</li>
-      <li>Two or more displays</li>
-      <li>Dock at the bottom of the screen</li>
-    </ul>
-  </section>
-
-  <footer>
-    Made by <a href="https://github.com/green2grey">green2grey</a>
-  </footer>
+<div class="hero-anim-band">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 250" aria-hidden="true"><defs><filter id="neonGlow" x="-50%" y="-50%" width="400%" height="200%"><feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur1"/><feGaussianBlur in="SourceGraphic" stdDeviation="1" result="blur2"/><feMerge><feMergeNode in="blur1"/><feMergeNode in="blur2"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><style>@keyframes traverse{0%{transform:translate(40px,110px) scaleX(1);opacity:0}5%{transform:translate(40px,110px) scaleX(1);opacity:1;fill:green}18%{transform:translate(90px,110px) scaleX(1.8);fill:green}20%{transform:translate(100px,110px) scaleX(.5);fill:red}24%{transform:translate(75px,110px) scaleX(1);fill:reds}43%{transform:translate(330px,110px) scaleX(1.8);fill:green}45%{transform:translate(340px,110px) scaleX(.5);fill:red}49%{transform:translate(315px,110px) scaleX(1);fill:green}68%{transform:translate(630px,110px) scaleX(1.8);fill:green}71%{transform:translate(640px,110px) scaleX(1);fill:green}75%,90%{transform:translate(640px,110px) scaleX(1);fill:#7cb87c}to{transform:translate(640px,110px) scaleX(1);fill:#7cb87c;opacity:0}}@keyframes glitch1{0%,19%,24%,to{transform:translate(0,0);stroke-width:2;opacity:1}20%{transform:translate(-4px,0) skewX(-15deg);stroke-width:4;opacity:.8}22%{transform:translate(3px,0) skewX(10deg);stroke-width:1;opacity:.9}}@keyframes glitch2{0%,44%,49%,to{transform:translate(0,0);stroke-width:2;opacity:1}45%{transform:translate(-4px,0) skewX(-15deg);stroke-width:4;opacity:.8}47%{transform:translate(3px,0) skewX(10deg);stroke-width:1;opacity:.9}}@keyframes acceptFrame{0%,70%,to{stroke:green;filter:none}74%,90%{stroke:#7cb87c;filter:url(#neonGlow)}}@keyframes acceptInner{0%,70%,to{fill:transparent;stroke:green}74%,90%{fill:rgba(124,184,124,.1);stroke:#7cb87c}}@keyframes errFlash1{0%,19%,26%,to{opacity:0}20%,25%{opacity:1}}@keyframes errFlash2{0%,44%,51%,to{opacity:0}45%,50%{opacity:1}}@keyframes acceptText{0%,70%,to{fill:green}74%,90%{fill:#7cb87c;font-weight:700}}.stroke-main{stroke:green;stroke-width:2;fill:none;shape-rendering:crispEdges}.font-mono{font-family:monospace;font-size:10px;fill:green;letter-spacing:1px}</style><path d="M0 110h800M160 10v20m-10-10h20m230-10v20m-10-10h20m230-10v20m-10-10h20" style="stroke:green;fill:none;shape-rendering:crispEdges;stroke-width:0;stroke-dasharray:4 4"/><text x="160" y="215" text-anchor="middle" class="font-mono" font-weight="bold" style="animation:errFlash1 4s step-end infinite">ERR_REJECTED</text><g style="animation:glitch1 4s step-end infinite;transform-origin:160px 110px"><path class="stroke-main" d="M100 70h120v80H100z"/><path class="stroke-main" d="M105 75h110v70H105zm45 75h20v20h-20zm-30 20h80v10h-80z"/><path d="M160 90v40m-20-20h40" class="stroke-main" opacity=".2"/></g><text x="400" y="215" text-anchor="middle" class="font-mono" font-weight="bold" style="animation:errFlash2 4s step-end infinite">ERR_REJECTED</text><g style="animation:glitch2 4s step-end infinite;transform-origin:400px 110px"><path class="stroke-main" d="M340 70h120v80H340z"/><path class="stroke-main" d="M345 75h110v70H345zm45 75h20v20h-20zm-30 20h80v10h-80z"/><path d="M400 90v40m-20-20h40" class="stroke-main" opacity=".2"/></g><g style="animation:acceptFrame 4s ease-in-out infinite"><path class="stroke-main" d="M580 70h120v80H580z"/><path class="stroke-main" style="animation:acceptInner 4s ease-in-out infinite" d="M585 75h110v70H585z"/><path class="stroke-main" d="M630 150h20v20h-20zm-30 20h80v10h-80zm25-70h30v20h-30z"/></g><path style="shape-rendering:crispEdges;animation:traverse 4s cubic-bezier(.4,0,.2,1) infinite" d="M-10-5h20V5h-20z"/></svg>
 
 </div>
 
+<section class="demo-section">
+  <div class="section-label">Try it &mdash; interactive</div>
+  <div class="demo-frame">
+    <!-- Menu bar -->
+    <div class="demo-bar">
+      <div class="demo-bar-left">
+        <span>Finder</span>
+        <span>File</span>
+        <span>Edit</span>
+        <span>View</span>
+      </div>
+      <div class="demo-bar-right">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#777" stroke-width="2"><path d="M6 3v18M18 3v18M6 12h12"/></svg>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#777" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l4 2"/></svg>
+        <svg class="demo-bar-trigger" id="demo-trigger" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2" aria-label="Open DockPin menu">
+          <rect x="2" y="3" width="20" height="14"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10" r="2" fill="#ccc" stroke="none"/>
+        </svg>
+        <span class="bar-time" id="demo-clock"></span>
+      </div>
+    </div>
+
+    <!-- Display visualization -->
+    <div class="demo-canvas">
+      <div class="demo-monitor">
+        <div class="demo-display demo-display--ext" data-display="dell">
+          <span class="demo-display-label">DELL U2723QE</span>
+          <span class="demo-display-state">blocked</span>
+          <div class="demo-dock">
+            <div class="dock-pip" style="background:#2d5a2d"></div>
+            <div class="dock-pip" style="background:#3a6a3a"></div>
+            <div class="dock-pip" style="background:#4a7a4a"></div>
+            <div class="dock-pip" style="background:#2d5a2d"></div>
+            <div class="dock-pip" style="background:#5a8a5a"></div>
+            <div class="dock-pip" style="background:#3a6a3a"></div>
+            <div class="dock-pip" style="background:#4a7a4a"></div>
+          </div>
+        </div>
+        <div class="demo-stand demo-stand--wide"></div>
+      </div>
+      <div class="demo-monitor">
+        <div class="demo-display demo-display--int allowed has-dock" data-display="builtin">
+          <span class="demo-display-label">Built-in Retina</span>
+          <span class="demo-display-state">allowed</span>
+          <div class="demo-dock">
+            <div class="dock-pip" style="background:#2d5a2d"></div>
+            <div class="dock-pip" style="background:#3a6a3a"></div>
+            <div class="dock-pip" style="background:#4a7a4a"></div>
+            <div class="dock-pip" style="background:#2d5a2d"></div>
+            <div class="dock-pip" style="background:#5a8a5a"></div>
+            <div class="dock-pip" style="background:#3a6a3a"></div>
+            <div class="dock-pip" style="background:#4a7a4a"></div>
+          </div>
+        </div>
+        <div class="demo-stand"></div>
+      </div>
+      <div class="demo-monitor">
+        <div class="demo-display demo-display--ext allowed" data-display="lg">
+          <span class="demo-display-label">LG 27UK850</span>
+          <span class="demo-display-state">allowed</span>
+          <div class="demo-dock">
+            <div class="dock-pip" style="background:#2d5a2d"></div>
+            <div class="dock-pip" style="background:#3a6a3a"></div>
+            <div class="dock-pip" style="background:#4a7a4a"></div>
+            <div class="dock-pip" style="background:#2d5a2d"></div>
+            <div class="dock-pip" style="background:#5a8a5a"></div>
+            <div class="dock-pip" style="background:#3a6a3a"></div>
+            <div class="dock-pip" style="background:#4a7a4a"></div>
+          </div>
+        </div>
+        <div class="demo-stand demo-stand--wide"></div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="demo-status">
+      <div class="demo-status-dot" id="demo-dot"></div>
+      <span id="demo-status-text">PROFILE: Home Office &ensp;// &ensp;DISPLAYS: Built-in Retina, LG 27UK850 &ensp;// &ensp;MODIFIER: Option &#8997;</span>
+    </div>
+
+    <!-- Dropdown -->
+    <div class="demo-menu open" id="demo-main">
+      <div class="demo-header" id="demo-profile-name">Home Office</div>
+      <div class="demo-sep"></div>
+      <div class="demo-item" id="demo-toggle-item">
+        <span class="demo-item-left">DockPin Enabled</span>
+        <span class="demo-toggle on" id="demo-enable"></span>
+      </div>
+      <div class="demo-sep"></div>
+      <div class="demo-item demo-has-sub" id="menu-displays">
+        <span class="demo-item-left">Allow Dock on Display</span>
+        <span class="demo-arrow">&lsaquo;</span>
+        <div class="demo-submenu" id="sub-displays">
+          <div class="demo-item display-item" data-display="dell">
+            <span class="demo-item-left"><span class="demo-check"></span> DELL U2723QE</span>
+          </div>
+          <div class="demo-item display-item" data-display="builtin">
+            <span class="demo-item-left"><span class="demo-check">&check;</span> Built-in Retina</span>
+          </div>
+          <div class="demo-item display-item" data-display="lg">
+            <span class="demo-item-left"><span class="demo-check">&check;</span> LG 27UK850</span>
+          </div>
+        </div>
+      </div>
+      <div class="demo-item demo-has-sub" id="menu-modifier">
+        <span class="demo-item-left">Override Modifier</span>
+        <span class="demo-arrow">&lsaquo;</span>
+        <div class="demo-submenu" id="sub-modifier">
+          <div class="demo-item modifier-item" data-mod="option">
+            <span class="demo-item-left"><span class="demo-check">&check;</span> Option &#8997;</span>
+          </div>
+          <div class="demo-item modifier-item" data-mod="control">
+            <span class="demo-item-left"><span class="demo-check"></span> Control &#8963;</span>
+          </div>
+          <div class="demo-item modifier-item" data-mod="shift">
+            <span class="demo-item-left"><span class="demo-check"></span> Shift &#8679;</span>
+          </div>
+          <div class="demo-item modifier-item" data-mod="command">
+            <span class="demo-item-left"><span class="demo-check"></span> Command &#8984;</span>
+          </div>
+        </div>
+      </div>
+      <div class="demo-item demo-has-sub" id="menu-profiles">
+        <span class="demo-item-left">Profiles</span>
+        <span class="demo-arrow">&lsaquo;</span>
+        <div class="demo-submenu" id="sub-profiles">
+          <div class="demo-item profile-item" data-profile="home">
+            <span class="demo-item-left"><span class="demo-check">&check;</span> Home Office</span>
+          </div>
+          <div class="demo-item profile-item" data-profile="work">
+            <span class="demo-item-left"><span class="demo-check"></span> Work</span>
+          </div>
+          <div class="demo-item profile-item" data-profile="laptop">
+            <span class="demo-item-left"><span class="demo-check"></span> Laptop Only</span>
+          </div>
+          <div class="demo-sep"></div>
+          <div class="demo-item" id="demo-autoprofile">
+            <span class="demo-item-left"><span class="demo-check">&check;</span> Auto-Switch</span>
+          </div>
+          <div class="demo-sep"></div>
+          <div class="demo-item" id="demo-saveprofile">
+            <span class="demo-item-left">Save Current Profile</span>
+          </div>
+        </div>
+      </div>
+      <div class="demo-sep"></div>
+      <div class="demo-item" id="demo-login">
+        <span class="demo-item-left"><span class="demo-check">&check;</span> Launch at Login</span>
+      </div>
+      <div class="demo-item" id="demo-updates">
+        <span class="demo-item-left"><span class="demo-check">&check;</span> Check for Updates</span>
+      </div>
+      <div class="demo-sep"></div>
+      <div class="demo-item" id="demo-quit">
+        <span class="demo-item-left">Quit DockPin</span>
+      </div>
+    </div>
+
+    <div class="demo-toast" id="demo-toast"></div>
+  </div>
+  <p class="demo-hint">Click the menu items to configure &mdash; the displays update in real-time</p>
+</section>
+
+<section class="how-it-works">
+  <div class="how-inner">
+    <div class="section-label">How it works</div>
+    <div class="steps-grid">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-title">Download &amp; launch</div>
+        <div class="step-desc">Grant Accessibility when prompted</div>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-title">Choose your displays</div>
+        <div class="step-desc">Pick which screens can host the Dock</div>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div class="step-title">Done</div>
+        <div class="step-desc">Runs in the menu bar, stays out of your way</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="features-section">
+  <div class="section-label">Features</div>
+  <div class="features-grid">
+    <div class="feature">
+      <div class="feature-num">01</div>
+      <div class="feature-title">Pin to any display</div>
+      <div class="feature-desc">Choose exactly which monitors can host the Dock. The rest are locked out.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-num">02</div>
+      <div class="feature-title">Display profiles</div>
+      <div class="feature-desc">Save different configurations for home, office, or any monitor arrangement.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-num">03</div>
+      <div class="feature-title">Auto-switch</div>
+      <div class="feature-desc">Plug in a different monitor and DockPin applies the right profile automatically.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-num">04</div>
+      <div class="feature-title">Override anytime</div>
+      <div class="feature-desc">Hold Option to temporarily free the Dock. Configurable per profile.</div>
+    </div>
+  </div>
+</section>
+
+<section class="whats-new">
+  <div class="whats-new-inner">
+    <div>
+      <div class="whats-new-heading">What's<br>new</div>
+      <span class="whats-new-version">V2.0</span>
+    </div>
+    <ul>
+      <li>Display profiles with per-setup configurations</li>
+      <li>Automatic profile switching when displays change</li>
+      <li>Guided setup for first-time use</li>
+      <li>Automatic updates</li>
+    </ul>
+  </div>
+</section>
+
+<section class="requirements">
+  <p>Requires macOS 13 or later // Two or more displays // Dock at the bottom of the screen // Displays have separate Spaces enabled in System Settings</p>
+</section>
+
+<footer>
+  <span>Made by <a href="https://github.com/green2grey" target="_blank" rel="noopener noreferrer">green2grey</a></span>
+  <div class="footer-links">
+    <a href="https://github.com/green2grey/DockPin" target="_blank" rel="noopener noreferrer">GitHub</a>
+    <span>Updates automatically</span>
+  </div>
+</footer>
+
 <script>
-  fetch('https://api.github.com/repos/green2grey/DockPin/releases/latest')
-    .then(r => r.ok ? r.json() : Promise.reject())
-    .then(data => {
-      const btn = document.getElementById('download');
-      const ver = document.getElementById('version');
-      if (data.assets && data.assets.length > 0) {
-        btn.href = data.assets[0].browser_download_url;
-      }
-      if (data.tag_name) {
-        ver.textContent = data.tag_name + ' \u00B7 macOS';
-      }
-    })
-    .catch(() => {
-      document.getElementById('version').textContent = 'macOS';
+(function() {
+  // ── State ──
+  const profiles = {
+    home:   { name: 'Home Office',  displays: { dell: false, builtin: true, lg: true }, modifier: 'option' },
+    work:   { name: 'Work',         displays: { dell: true, builtin: true, lg: false }, modifier: 'command' },
+    laptop: { name: 'Laptop Only',  displays: { dell: false, builtin: true, lg: false }, modifier: 'option' }
+  };
+
+  const modLabels = { option: 'Option \u2325', control: 'Control \u2303', shift: 'Shift \u21E7', command: 'Command \u2318' };
+
+  const state = {
+    enabled: true,
+    profile: 'home',
+    displays: { dell: false, builtin: true, lg: true },
+    modifier: 'option',
+    dockOn: 'builtin',
+    loginAtStart: true,
+    checkUpdates: true,
+    autoSwitch: true
+  };
+
+  // ── DOM refs ──
+  const trigger = document.getElementById('demo-trigger');
+  const menu = document.getElementById('demo-main');
+  const toast = document.getElementById('demo-toast');
+  const statusText = document.getElementById('demo-status-text');
+  const statusDot = document.getElementById('demo-dot');
+  const profileName = document.getElementById('demo-profile-name');
+  const enableToggle = document.getElementById('demo-enable');
+  let toastTimer;
+
+  // ── Clock ──
+  function tickClock() {
+    const d = new Date();
+    document.getElementById('demo-clock').textContent =
+      d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+  tickClock();
+  setInterval(tickClock, 30000);
+
+  // ── Render ──
+  function render() {
+    // Displays
+    document.querySelectorAll('.demo-display').forEach(el => {
+      const key = el.dataset.display;
+      const allowed = state.enabled && state.displays[key];
+      el.classList.toggle('allowed', allowed);
+      el.classList.toggle('has-dock', allowed && state.dockOn === key);
+      el.querySelector('.demo-display-state').textContent = state.enabled ? (allowed ? 'allowed' : 'blocked') : 'disabled';
     });
+
+    // Menu checkmarks — displays
+    document.querySelectorAll('.display-item').forEach(el => {
+      el.querySelector('.demo-check').innerHTML = state.displays[el.dataset.display] ? '&check;' : '';
+    });
+
+    // Menu checkmarks — modifier
+    document.querySelectorAll('.modifier-item').forEach(el => {
+      el.querySelector('.demo-check').innerHTML = el.dataset.mod === state.modifier ? '&check;' : '';
+    });
+
+    // Menu checkmarks — profiles
+    document.querySelectorAll('.profile-item').forEach(el => {
+      el.querySelector('.demo-check').innerHTML = el.dataset.profile === state.profile ? '&check;' : '';
+    });
+
+    // Toggle
+    enableToggle.classList.toggle('on', state.enabled);
+
+    // Profile name
+    profileName.textContent = profiles[state.profile].name;
+
+    // Status dot
+    statusDot.classList.toggle('off', !state.enabled);
+
+    // Status text
+    if (!state.enabled) {
+      statusText.innerHTML = 'DOCKPIN DISABLED &ensp;// &ensp;Dock is free to move between all displays';
+    } else {
+      const allowed = Object.entries(state.displays).filter(([,v]) => v).map(([k]) => {
+        return { dell: 'DELL U2723QE', builtin: 'Built-in Retina', lg: 'LG 27UK850' }[k];
+      });
+      statusText.innerHTML = 'PROFILE: ' + profiles[state.profile].name +
+        ' &ensp;// &ensp;DISPLAYS: ' + (allowed.length ? allowed.join(', ') : 'None') +
+        ' &ensp;// &ensp;MODIFIER: ' + modLabels[state.modifier];
+    }
+  }
+
+  function moveDock() {
+    if (!state.displays[state.dockOn]) {
+      const next = Object.keys(state.displays).find(k => state.displays[k]);
+      state.dockOn = next || null;
+    }
+  }
+
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 1600);
+  }
+
+  // ── Events ──
+
+  // Menu toggle
+  trigger.addEventListener('click', () => {
+    const open = menu.classList.toggle('open');
+    trigger.classList.toggle('active', open);
+  });
+
+  // Enable toggle
+  document.getElementById('demo-toggle-item').addEventListener('click', () => {
+    state.enabled = !state.enabled;
+    render();
+    showToast(state.enabled ? 'DockPin enabled' : 'DockPin disabled');
+  });
+
+  // Display toggles
+  document.querySelectorAll('.display-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const key = item.dataset.display;
+      state.displays[key] = !state.displays[key];
+      moveDock();
+      render();
+      const label = { dell: 'DELL U2723QE', builtin: 'Built-in Retina', lg: 'LG 27UK850' }[key];
+      showToast(state.displays[key] ? label + ' allowed' : label + ' blocked');
+    });
+
+    // Highlight display on hover
+    item.addEventListener('mouseenter', () => {
+      const el = document.querySelector('.demo-display[data-display="' + item.dataset.display + '"]');
+      if (el) el.classList.add('glow');
+    });
+    item.addEventListener('mouseleave', () => {
+      document.querySelectorAll('.demo-display.glow').forEach(d => d.classList.remove('glow'));
+    });
+  });
+
+  // Modifier radio
+  document.querySelectorAll('.modifier-item').forEach(item => {
+    item.addEventListener('click', () => {
+      state.modifier = item.dataset.mod;
+      render();
+      showToast('Override: ' + modLabels[state.modifier]);
+    });
+  });
+
+  // Profile switch
+  document.querySelectorAll('.profile-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const key = item.dataset.profile;
+      const p = profiles[key];
+      state.profile = key;
+      state.displays = { ...p.displays };
+      state.modifier = p.modifier;
+      moveDock();
+      render();
+      showToast('Switched to ' + p.name);
+    });
+  });
+
+  // Checkbox toggles
+  ['demo-login', 'demo-updates', 'demo-autoprofile'].forEach(id => {
+    document.getElementById(id).addEventListener('click', () => {
+      const check = document.getElementById(id).querySelector('.demo-check');
+      const has = check.textContent.trim() === '\u2713';
+      check.innerHTML = has ? '' : '&check;';
+    });
+  });
+
+  // Save profile
+  document.getElementById('demo-saveprofile').addEventListener('click', () => {
+    showToast('Profile saved');
+  });
+
+  // Quit
+  document.getElementById('demo-quit').addEventListener('click', () => {
+    menu.classList.remove('open');
+    trigger.classList.remove('active');
+    showToast('Just a demo :)');
+  });
+
+  // Click on displays to move dock
+  document.querySelectorAll('.demo-display').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', () => {
+      const key = el.dataset.display;
+      if (state.enabled && state.displays[key]) {
+        state.dockOn = key;
+        render();
+        showToast('Dock moved to ' + { dell: 'DELL', builtin: 'Built-in', lg: 'LG' }[key]);
+      } else if (state.enabled) {
+        showToast('Display is blocked');
+      }
+    });
+  });
+
+  render();
+})();
+
+fetch('https://api.github.com/repos/green2grey/DockPin/releases/latest')
+  .then(r => r.ok ? r.json() : Promise.reject())
+  .then(data => {
+    const btn = document.getElementById('download');
+    const ver = document.getElementById('version');
+    if (data.assets && data.assets.length > 0) {
+      btn.href = data.assets[0].browser_download_url;
+      const mb = (data.assets[0].size / 1048576).toFixed(1);
+      ver.innerHTML = data.tag_name + ' // macOS 13+ // ' + mb + ' MB';
+    } else if (data.tag_name) {
+      ver.innerHTML = data.tag_name + ' // macOS 13+';
+    }
+  })
+  .catch(() => {});
 </script>
 
 </body>

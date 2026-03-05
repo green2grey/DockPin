@@ -9,9 +9,9 @@
     <key>CFBundleIdentifier</key>
     <string>com.green2grey.DockPin</string>
     <key>CFBundleVersion</key>
-    <string>1.0</string>
+    <string>200</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>2.0</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
@@ -23,6 +23,12 @@
     <key>CFBundleIconFile</key>
     <string>DockPin</string>
     <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>SUFeedURL</key>
+    <string>https://green2grey.github.io/DockPin/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>VMv7sKN60Zft++OFlA6/gJ2RiveZa/N/U5LOGs1L+Fc=</string>
+    <key>SUEnableAutomaticChecks</key>
     <true/>
 </dict>
 </plist>

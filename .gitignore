@@ -1,4 +1,11 @@
 build/
+.build/
+.swiftpm/
 .DS_Store
 *.iconset/
 generate_icon.swift
+Package.resolved
+v2_profiles.md
+sparkle.md
+v2_ui.md
+v2simple.md
