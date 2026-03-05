@@ -4,12 +4,12 @@
         <title>DockPin</title>
         <item>
             <title>2.0</title>
-            <pubDate>Wed, 04 Mar 2026 21:27:38 -0800</pubDate>
+            <pubDate>Wed, 04 Mar 2026 23:14:01 -0800</pubDate>
             <sparkle:version>200</sparkle:version>
             <sparkle:shortVersionString>2.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/green2grey/DockPin/releases/download/v2.0/DockPin.zip" length="4892496" type="application/octet-stream" sparkle:edSignature="gQjo2M4QD3XhWb4jRIrm+nUAYrxR+TPBszEE1inNaGLAXj/giphttN7YRygLDL1wKGbHxGOBEzvdFnebGhPiAA=="/>
+            <enclosure url="https://github.com/green2grey/DockPin/releases/download/v2.0/DockPin.zip" length="2111409" type="application/octet-stream" sparkle:edSignature="VLE/hPKO8bFdy5I7qvlldzwkf/lMdi5O1BDKjrmTjjRRW7w8KAMkV+wrNFuBgnVJsOWrzvOFiYV4KXvIQG0gCA=="/>
         </item>
     </channel>
 </rss>
