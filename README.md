@@ -11,10 +11,12 @@ Pin your Mac's Dock to specific displays and prevent it from jumping between scr
 
 ## Features
 
-- Lock the Dock to selected displays
+- Lock the Dock to selected displays on the current macOS Dock edge
 - **Display profiles** — save per-display-setup configurations and switch between them
 - **Auto-switch profiles** — automatically apply the right profile when displays change
 - Allow or disallow specific monitors for Dock placement
+- Warn when your display arrangement blocks the current Dock edge
+- Best-effort re-anchor of the Dock to a single allowed display
 - Temporarily override locking with a modifier key (Option by default)
 - **Automatic updates** via Sparkle
 - Launch at startup with persistent settings
@@ -24,7 +26,7 @@ Pin your Mac's Dock to specific displays and prevent it from jumping between scr
 
 - macOS 13 or later
 - Two or more connected displays
-- Dock positioned at the bottom of the screen
+- Dock positioned on the Left, Bottom, or Right edge
 - "Displays have separate Spaces" enabled in System Settings
 
 ## Install
@@ -41,6 +43,11 @@ Or visit [green2grey.github.io/DockPin](https://green2grey.github.io/DockPin/) f
 4. Enable DockPin from the menu
 
 Hold the override modifier key (Option by default) to temporarily move the Dock freely.
+If you allow exactly one display, use **Re-anchor Dock Now** to best-effort pull the Dock back after display changes.
+
+### Layout Limits
+
+DockPin can only keep the Dock on displays whose current Dock edge is exposed. Example: if the Dock is set to **Bottom** and another display sits directly below the selected monitor, macOS will not place the Dock on that monitor’s bottom edge. DockPin now warns when the current display arrangement blocks the selected edge.
 
 ### Profiles
 

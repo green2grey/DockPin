@@ -36,6 +36,7 @@ struct DisplayDescriptor: Hashable, Sendable {
     var displayID: CGDirectDisplayID
     var stableID: DisplayStableID
     var localizedName: String
+    var frame: CGRect
     var isBuiltIn: Bool
     var isMirroredSecondary: Bool
 }
@@ -60,6 +61,7 @@ struct DisplaySnapshot: Sendable {
                 displayID: displayID,
                 stableID: stableID,
                 localizedName: screen.localizedName,
+                frame: screen.frame,
                 isBuiltIn: CGDisplayIsBuiltin(displayID) != 0,
                 isMirroredSecondary: isMirroredSecondary
             )
@@ -106,4 +108,3 @@ struct DisplaySnapshot: Sendable {
             .map(\.displayID)
     }
 }
-

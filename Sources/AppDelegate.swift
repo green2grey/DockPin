@@ -12,9 +12,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var screenChangeTick = 0
 
     let monitor = DockMonitor()
+    private let dockReanchorer = DockReanchorer()
     private let profileManager = ProfileManager()
 
-    /// Sparkle updater controller. Starts automatic background checks on launch.
     let updaterController: SPUStandardUpdaterController
 
     override init() {
@@ -94,13 +94,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return menu
     }
 
-    /// Rebuild the full menu contents (called each time the menu opens via delegate).
     fileprivate func populateMenu(_ menu: NSMenu) {
         menu.removeAllItems()
 
         let snapshot = DisplaySnapshot.current()
         let configured = isConfigured
         let active = profileManager.activeProfile
+        let dockEdge = DockEdge.current()
+        let reachability = DisplayLayoutAnalyzer.reachabilityMap(
+            snapshot: snapshot,
+            edge: dockEdge,
+            mirroringPolicy: active?.mirroringPolicy ?? .ignoreMirroredSecondaries
+        )
 
         // ── Header ──
         let hdrTitle: String = {
@@ -131,13 +136,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         toggle.keyEquivalentModifierMask = [.command]
         toggle.target = self
-        toggle.isEnabled = configured && canEnableDockPin(activeProfile: active, snapshot: snapshot)
-        if configured, NSScreen.screens.count < 2, active?.isEnabled != true {
-            toggle.toolTip = "Requires two or more displays"
-        } else if !configured {
-            toggle.toolTip = "Set up DockPin first"
-        }
+        let resolvedAllowed: Set<CGDirectDisplayID> = {
+            guard let active else { return [] }
+            return profileManager.resolveAllowedDisplayIDs(for: active, snapshot: snapshot)
+        }()
+        let toggleDisabledReason = toggleEnableDisabledReason(
+            activeProfile: active,
+            resolvedAllowed: resolvedAllowed,
+            dockEdge: dockEdge,
+            reachability: reachability
+        )
+        toggle.isEnabled = toggleDisabledReason == nil
+        toggle.toolTip = toggleDisabledReason
         menu.addItem(toggle)
+
+        menu.addItem(.separator())
+
+        let edgeInfo = NSMenuItem(title: "Current Dock Edge: \(dockEdge.label)", action: nil, keyEquivalent: "")
+        edgeInfo.isEnabled = false
+        menu.addItem(edgeInfo)
 
         menu.addItem(.separator())
 
@@ -167,16 +184,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             allowMenu.addItem(note)
         }
         for d in displays {
-            let mi = NSMenuItem(title: d.localizedName, action: #selector(toggleAllow(_:)), keyEquivalent: "")
+            let isReachable = reachability[d.displayID]?.isReachable ?? true
+            let title = isReachable ? d.localizedName : "\(d.localizedName) (current edge blocked)"
+            let mi = NSMenuItem(title: title, action: #selector(toggleAllow(_:)), keyEquivalent: "")
             mi.target = self
             mi.representedObject = d.stableID
             mi.image = Self.displayIcon
             mi.state = (active?.allowedDisplays.contains(d.stableID) == true) ? .on : .off
+            if !isReachable {
+                mi.toolTip = reachability[d.displayID]?.blockedReason
+            }
             allowMenu.addItem(mi)
         }
         allowItem.submenu = allowMenu
         allowItem.isEnabled = configured
         menu.addItem(allowItem)
+
+        let reanchor = NSMenuItem(title: "Re-anchor Dock Now", action: #selector(reanchorDockNow), keyEquivalent: "")
+        reanchor.target = self
+        let plan = reanchorPlan(activeProfile: active, resolvedAllowed: resolvedAllowed, reachability: reachability)
+        reanchor.isEnabled = plan.target != nil
+        reanchor.toolTip = plan.disabledReason
+        menu.addItem(reanchor)
+
+        if let active, let warning = blockedSelectionSummary(
+            resolvedAllowed: resolvedAllowed,
+            snapshot: snapshot,
+            mirroringPolicy: active.mirroringPolicy,
+            dockEdge: dockEdge,
+            reachability: reachability
+        ) {
+            let warningItem = NSMenuItem(title: warning, action: nil, keyEquivalent: "")
+            warningItem.isEnabled = false
+            menu.addItem(warningItem)
+        }
 
         menu.addItem(.separator())
 
@@ -256,7 +297,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let headingFont = NSFont.systemFont(ofSize: 16, weight: .semibold)
         let bodyFont = NSFont.systemFont(ofSize: 13, weight: .regular)
         let bodyColor = NSColor.labelColor
-        let secondaryColor = NSColor.secondaryLabelColor
 
         let bodyPara = NSMutableParagraphStyle()
         bodyPara.paragraphSpacing = 8
@@ -323,6 +363,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         heading("Auto-switching")
         body("If auto-switching is enabled, DockPin can switch profiles based on display configurations. If multiple profiles match equally, DockPin won't switch automatically.")
 
+        heading("Dock Edge")
+        body("DockPin follows the current macOS Dock edge setting (Left, Bottom, or Right). If another display fully covers the chosen edge, macOS won’t place the Dock there. DockPin warns when your current arrangement blocks that edge.")
+
+        heading("Re-anchor Dock Now")
+        body("macOS does not provide any way for apps to move the Dock to a specific display. When you select Re-anchor Dock Now, DockPin briefly moves the cursor to the chosen display’s edge and back to simulate the gesture macOS uses to relocate the Dock. This is best-effort — it may not work in every situation.")
+        body("Re-anchor is available when exactly one display is allowed and its current Dock edge is exposed. DockPin also attempts a re-anchor automatically when you enable locking, switch profiles, or displays change.")
+
         heading("Override Modifier Key")
         body("Hold a modifier key (Option by default) to temporarily bypass locking and move the Dock freely. You can change the key per profile under Override Modifier Key.")
 
@@ -332,7 +379,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         heading("Requirements")
         bullet("macOS 13 or later")
         bullet("Two or more connected displays")
-        bullet("Dock positioned at the bottom of the screen")
+        bullet("Dock positioned on the Left, Bottom, or Right edge")
         bullet("\"Displays have separate Spaces\" enabled (System Settings → Desktop & Dock)")
 
         return result
@@ -348,18 +395,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleEnabled() {
         guard isConfigured, let active = profileManager.activeProfile else { return }
+        let snapshot = DisplaySnapshot.current()
+        let dockEdge = DockEdge.current()
+        let reachability = DisplayLayoutAnalyzer.reachabilityMap(
+            snapshot: snapshot,
+            edge: dockEdge,
+            mirroringPolicy: active.mirroringPolicy
+        )
+        let resolvedAllowed = profileManager.resolveAllowedDisplayIDs(for: active, snapshot: snapshot)
 
         if active.isEnabled {
             profileManager.updateProfile(id: active.id) { $0.isEnabled = false }
         } else {
-            if active.allowedDisplays.isEmpty {
+            if resolvedAllowed.isEmpty {
                 showNeedsAllowedDisplayAlert()
+                return
+            }
+            if reachableAllowedDisplayIDs(resolvedAllowed: resolvedAllowed, reachability: reachability).isEmpty {
+                showBlockedDockEdgeAlert(
+                    dockEdge: dockEdge,
+                    blockedDisplays: blockedAllowedDisplayNames(
+                        resolvedAllowed: resolvedAllowed,
+                        snapshot: snapshot,
+                        mirroringPolicy: active.mirroringPolicy,
+                        reachability: reachability
+                    )
+                )
                 return
             }
             profileManager.updateProfile(id: active.id) { $0.isEnabled = true }
         }
 
-        applyCurrentState(snapshot: .current())
+        applyCurrentState(snapshot: snapshot, attemptReanchor: true)
         updateIcon()
     }
 
@@ -377,7 +444,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             profileManager.updateProfile(id: active.id) { $0.allowedDisplays.insert(stableID) }
         }
 
-        applyCurrentState(snapshot: .current())
+        applyCurrentState(snapshot: .current(), attemptReanchor: true)
     }
 
     @objc private func pickModifier(_ sender: NSMenuItem) {
@@ -443,7 +510,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func selectProfile(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? UUID else { return }
         profileManager.setActiveProfile(id: id, manualHold: true)
-        applyCurrentState(snapshot: .current())
+        applyCurrentState(snapshot: .current(), attemptReanchor: true)
     }
 
     @objc private func toggleAutoSwitch() {
@@ -483,13 +550,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func quitApp() {
+        dockReanchorer.cancel()
         monitor.stopLocking()
         NSApp.terminate(nil)
     }
 
     @objc private func screensChanged() {
-        applyCurrentState(snapshot: .current())
+        applyCurrentState(snapshot: .current(), attemptReanchor: true)
         scheduleAutoSwitch()
+    }
+
+    @objc private func reanchorDockNow() {
+        guard let active = profileManager.activeProfile else { return }
+        let snapshot = DisplaySnapshot.current()
+        let reachability = DisplayLayoutAnalyzer.reachabilityMap(
+            snapshot: snapshot,
+            edge: DockEdge.current(),
+            mirroringPolicy: active.mirroringPolicy
+        )
+        let resolvedAllowed = profileManager.resolveAllowedDisplayIDs(for: active, snapshot: snapshot)
+        guard let target = reanchorPlan(activeProfile: active, resolvedAllowed: resolvedAllowed, reachability: reachability).target else { return }
+        dockReanchorer.reanchor(to: target)
     }
 
     // MARK: - Helpers
@@ -511,6 +592,11 @@ extension AppDelegate: NSMenuDelegate {
 // MARK: - App state helpers
 
 extension AppDelegate {
+    private struct ReanchorPlan {
+        var target: DisplayEdgeReachability?
+        var disabledReason: String?
+    }
+
     private var isConfigured: Bool {
         profileManager.setupCompleted && !profileManager.profiles.isEmpty
     }
@@ -524,15 +610,95 @@ extension AppDelegate {
         AXIsProcessTrusted()
     }
 
-    private func canEnableDockPin(activeProfile: DockProfile?, snapshot: DisplaySnapshot) -> Bool {
-        if !isConfigured { return false }
-        if NSScreen.screens.count < 2 && activeProfile?.isEnabled != true { return false }
-        if activeProfile?.isEnabled == true { return true }
-        return true
+    private func toggleEnableDisabledReason(
+        activeProfile: DockProfile?,
+        resolvedAllowed: Set<CGDirectDisplayID>,
+        dockEdge: DockEdge,
+        reachability: [CGDirectDisplayID: DisplayEdgeReachability]
+    ) -> String? {
+        guard isConfigured else { return "Set up DockPin first" }
+        if activeProfile?.isEnabled == true { return nil }
+        if NSScreen.screens.count < 2 { return "Requires two or more displays" }
+        guard activeProfile != nil else { return "Select a profile first" }
+        if resolvedAllowed.isEmpty { return "Allow at least one display first" }
+        if reachableAllowedDisplayIDs(resolvedAllowed: resolvedAllowed, reachability: reachability).isEmpty {
+            return "No allowed display currently exposes the \(dockEdge.requirementDescription)"
+        }
+        return nil
     }
 
-    private func applyCurrentState(snapshot: DisplaySnapshot) {
+    private func reachableAllowedDisplayIDs(
+        resolvedAllowed: Set<CGDirectDisplayID>,
+        reachability: [CGDirectDisplayID: DisplayEdgeReachability]
+    ) -> Set<CGDirectDisplayID> {
+        Set(resolvedAllowed.filter { reachability[$0]?.isReachable == true })
+    }
+
+    private func blockedAllowedDisplayNames(
+        resolvedAllowed: Set<CGDirectDisplayID>,
+        snapshot: DisplaySnapshot,
+        mirroringPolicy: MirroringPolicy,
+        reachability: [CGDirectDisplayID: DisplayEdgeReachability]
+    ) -> [String] {
+        snapshot.filtered(for: mirroringPolicy)
+            .filter { resolvedAllowed.contains($0.displayID) }
+            .filter { !(reachability[$0.displayID]?.isReachable ?? false) }
+            .map(\.localizedName)
+    }
+
+    private func blockedSelectionSummary(
+        resolvedAllowed: Set<CGDirectDisplayID>,
+        snapshot: DisplaySnapshot,
+        mirroringPolicy: MirroringPolicy,
+        dockEdge: DockEdge,
+        reachability: [CGDirectDisplayID: DisplayEdgeReachability]
+    ) -> String? {
+        let names = blockedAllowedDisplayNames(
+            resolvedAllowed: resolvedAllowed,
+            snapshot: snapshot,
+            mirroringPolicy: mirroringPolicy,
+            reachability: reachability
+        )
+        guard !names.isEmpty else { return nil }
+
+        let summary = names.prefix(2).joined(separator: ", ")
+        if names.count > 2 {
+            return "\(dockEdge.label) edge blocked on: \(summary), +\(names.count - 2) more"
+        }
+        return "\(dockEdge.label) edge blocked on: \(summary)"
+    }
+
+    private func reanchorPlan(
+        activeProfile: DockProfile?,
+        resolvedAllowed: Set<CGDirectDisplayID>,
+        reachability: [CGDirectDisplayID: DisplayEdgeReachability]
+    ) -> ReanchorPlan {
+        guard let activeProfile else {
+            return ReanchorPlan(target: nil, disabledReason: "Select a profile first")
+        }
+        guard activeProfile.isEnabled else {
+            return ReanchorPlan(target: nil, disabledReason: "Enable DockPin first")
+        }
+        guard !resolvedAllowed.isEmpty else {
+            return ReanchorPlan(target: nil, disabledReason: "Allow at least one display first")
+        }
+        guard resolvedAllowed.count == 1, let displayID = resolvedAllowed.first else {
+            return ReanchorPlan(target: nil, disabledReason: "Re-anchor requires exactly one current allowed display")
+        }
+
+        guard let target = reachability[displayID] else {
+            return ReanchorPlan(target: nil, disabledReason: "Selected display is not currently available")
+        }
+        guard target.isReachable else {
+            return ReanchorPlan(target: nil, disabledReason: target.blockedReason)
+        }
+
+        return ReanchorPlan(target: target, disabledReason: nil)
+    }
+
+    private func applyCurrentState(snapshot: DisplaySnapshot, attemptReanchor: Bool = false) {
         guard isConfigured else {
+            dockReanchorer.cancel()
             monitor.stopLocking()
             monitor.allowedDisplays.removeAll()
             updateIcon()
@@ -544,20 +710,36 @@ extension AppDelegate {
         }
         guard let active = profileManager.activeProfile else { return }
 
+        let dockEdge = DockEdge.current()
+        let reachability = DisplayLayoutAnalyzer.reachabilityMap(
+            snapshot: snapshot,
+            edge: dockEdge,
+            mirroringPolicy: active.mirroringPolicy
+        )
         let resolvedAllowed = profileManager.resolveAllowedDisplayIDs(for: active, snapshot: snapshot)
+        let reachableAllowed = reachableAllowedDisplayIDs(resolvedAllowed: resolvedAllowed, reachability: reachability)
         monitor.allowedDisplays = resolvedAllowed
         monitor.overrideModifier = active.overrideModifier
 
-        if active.isEnabled, isAccessibilityTrusted(), !resolvedAllowed.isEmpty {
+        if active.isEnabled, isAccessibilityTrusted(), !reachableAllowed.isEmpty {
             if !monitor.startLocking() {
                 promptAccessibilityIfNeeded()
             }
         } else {
+            dockReanchorer.cancel()
             monitor.stopLocking()
         }
 
         if monitor.isEnabled {
             monitor.refreshScreenCache()
+        }
+
+        if attemptReanchor, active.isEnabled, monitor.isEnabled {
+            if let target = reanchorPlan(activeProfile: active, resolvedAllowed: resolvedAllowed, reachability: reachability).target {
+                dockReanchorer.reanchor(to: target)
+            } else {
+                dockReanchorer.cancel()
+            }
         }
 
         updateIcon()
@@ -589,6 +771,7 @@ extension AppDelegate {
         d.removeObject(forKey: "isEnabled")
         d.removeObject(forKey: "overrideModifier")
 
+        dockReanchorer.cancel()
         monitor.stopLocking()
         monitor.allowedDisplays.removeAll()
 
@@ -613,7 +796,7 @@ extension AppDelegate {
             self.profileManager.addProfile(profile, makeActive: true)
             self.profileManager.setupCompleted = true
             self.profileManager.manualHoldEnabled = false
-            self.applyCurrentState(snapshot: .current())
+            self.applyCurrentState(snapshot: .current(), attemptReanchor: enableAfterSetup)
         }
 
         setupWindowController?.present(snapshot: .current())
@@ -623,6 +806,22 @@ extension AppDelegate {
         let alert = NSAlert()
         alert.messageText = "At least one display must be allowed."
         alert.informativeText = "The Dock needs somewhere to live. Allow another display first before removing this one."
+        alert.alertStyle = .informational
+        alert.runModal()
+    }
+
+    private func showBlockedDockEdgeAlert(dockEdge: DockEdge, blockedDisplays: [String]) {
+        let alert = NSAlert()
+        alert.messageText = "No allowed display currently exposes the \(dockEdge.requirementDescription)."
+
+        if blockedDisplays.isEmpty {
+            alert.informativeText = "Rearrange your displays or change the macOS Dock position before enabling DockPin."
+        } else {
+            let summary = blockedDisplays.prefix(3).joined(separator: ", ")
+            let suffix = blockedDisplays.count > 3 ? ", +\(blockedDisplays.count - 3) more" : ""
+            alert.informativeText = "Rearrange your displays or change the macOS Dock position before enabling DockPin. Blocked: \(summary)\(suffix)."
+        }
+
         alert.alertStyle = .informational
         alert.runModal()
     }
@@ -667,6 +866,6 @@ extension AppDelegate {
         guard let match = profileManager.bestAutoSwitchMatch(snapshot: snapshot) else { return }
         guard match.id != profileManager.activeProfileID else { return }
         profileManager.setActiveProfile(id: match.id, manualHold: false)
-        applyCurrentState(snapshot: snapshot)
+        applyCurrentState(snapshot: snapshot, attemptReanchor: true)
     }
 }

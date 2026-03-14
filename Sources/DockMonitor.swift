@@ -33,35 +33,51 @@ enum ModifierOption: Int, CaseIterable, Codable, Sendable {
 
 // MARK: - Cached screen geometry
 
-struct ScreenBounds {
-    let cgLeft:   CGFloat
-    let cgRight:  CGFloat
-    let cgBottom: CGFloat   // bottom edge in CG coordinates (origin top-left, Y increases down)
+struct DockTriggerZone {
+    let edge: DockEdge
+    let minX: CGFloat
+    let maxX: CGFloat
+    let minY: CGFloat
+    let maxY: CGFloat
+    let triggerLine: CGFloat
+
+    func contains(_ point: CGPoint) -> Bool {
+        point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY
+    }
+
+    func nudgedPoint(from point: CGPoint) -> CGPoint {
+        var nudged = point
+        switch edge {
+        case .bottom:
+            nudged.y = triggerLine - 7
+        case .left:
+            nudged.x = triggerLine + 7
+        case .right:
+            nudged.x = triggerLine - 7
+        }
+        return nudged
+    }
 }
 
 // MARK: - DockMonitor
 
 final class DockMonitor {
+    private static let dockEdgePollInterval: TimeInterval = 0.5
 
-    /// Displays where the Dock is allowed.
     var allowedDisplays: Set<CGDirectDisplayID> = []
-
-    /// Modifier key that temporarily disables locking.
     var overrideModifier: ModifierOption = .option
-
-    /// Whether locking is active.
     private(set) var isEnabled = false
 
-    // Internals
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    /// Screen bounds for blocked displays (written on main thread, read in callback).
-    fileprivate var blockedScreens: [ScreenBounds] = []
+    private var dockEdgePollTimer: Timer?
+    /// Written on main thread, read in event tap callback.
+    fileprivate var blockedZones: [DockTriggerZone] = []
+    fileprivate var cachedDockEdge: DockEdge = .bottom
     fileprivate var overrideFlag: CGEventFlags? = CGEventFlags.maskAlternate
 
     // MARK: - Public
 
-    /// Returns `true` if locking started successfully, `false` if the event tap failed.
     @discardableResult
     func startLocking() -> Bool {
         guard !isEnabled else { return true }
@@ -69,6 +85,7 @@ final class DockMonitor {
         refreshScreenCache()
         if installEventTap() {
             isEnabled = true
+            startDockEdgePolling()
             return true
         }
         return false
@@ -77,29 +94,84 @@ final class DockMonitor {
     func stopLocking() {
         guard isEnabled else { return }
         isEnabled = false
+        stopDockEdgePolling()
         removeEventTap()
     }
 
-    /// Recompute cached bounds for all non-allowed screens.
     func refreshScreenCache() {
+        let dockEdge = DockEdge.current()
+        cachedDockEdge = dockEdge
         let primaryH = CGDisplayBounds(CGMainDisplayID()).height
-        blockedScreens = NSScreen.screens
-            .compactMap { s -> ScreenBounds? in
-                guard let displayID = s.dockPinDisplayID else { return nil }
-                guard !allowedDisplays.contains(displayID) else { return nil }
-                let f = s.frame
-                return ScreenBounds(
-                    cgLeft:   f.minX,
-                    cgRight:  f.maxX,
-                    cgBottom: primaryH - f.minY
-                )
+        let snapshot = DisplaySnapshot.current()
+        let reachability = DisplayLayoutAnalyzer.reachabilityMap(snapshot: snapshot, edge: dockEdge)
+        let reachableAllowedDisplays = Set(allowedDisplays.filter { reachability[$0]?.isReachable == true })
+
+        guard !reachableAllowedDisplays.isEmpty else {
+            blockedZones = []
+            overrideFlag = overrideModifier.cgFlag
+            return
+        }
+
+        blockedZones = snapshot.filtered(for: .ignoreMirroredSecondaries)
+            .filter { !reachableAllowedDisplays.contains($0.displayID) }
+            .flatMap { descriptor -> [DockTriggerZone] in
+                guard let info = reachability[descriptor.displayID] else { return [] }
+                return info.exposedIntervals.map { interval in
+                    zone(
+                        for: descriptor.frame,
+                        edge: dockEdge,
+                        interval: interval,
+                        primaryHeight: primaryH
+                    )
+                }
             }
         overrideFlag = overrideModifier.cgFlag
     }
 
+    private func zone(
+        for frame: CGRect,
+        edge: DockEdge,
+        interval: EdgeInterval,
+        primaryHeight: CGFloat
+    ) -> DockTriggerZone {
+        switch edge {
+        case .bottom:
+            let cgBottom = primaryHeight - frame.minY
+            return DockTriggerZone(
+                edge: .bottom,
+                minX: interval.start,
+                maxX: interval.end,
+                minY: cgBottom - 5,
+                maxY: cgBottom + 2,
+                triggerLine: cgBottom
+            )
+        case .left:
+            let cgMinY = primaryHeight - interval.end
+            let cgMaxY = primaryHeight - interval.start
+            return DockTriggerZone(
+                edge: .left,
+                minX: frame.minX - 2,
+                maxX: frame.minX + 5,
+                minY: cgMinY,
+                maxY: cgMaxY,
+                triggerLine: frame.minX
+            )
+        case .right:
+            let cgMinY = primaryHeight - interval.end
+            let cgMaxY = primaryHeight - interval.start
+            return DockTriggerZone(
+                edge: .right,
+                minX: frame.maxX - 5,
+                maxX: frame.maxX + 2,
+                minY: cgMinY,
+                maxY: cgMaxY,
+                triggerLine: frame.maxX
+            )
+        }
+    }
+
     // MARK: - Event Tap
 
-    /// Returns `true` if the tap was installed, `false` on failure (no Accessibility permission).
     private func installEventTap() -> Bool {
         let mask: CGEventMask =
             (1 << CGEventType.mouseMoved.rawValue) |
@@ -135,7 +207,23 @@ final class DockMonitor {
         runLoopSource = nil
     }
 
-    /// Core event processing – invoked from the C callback.
+    private func startDockEdgePolling() {
+        guard dockEdgePollTimer == nil else { return }
+
+        let timer = Timer(timeInterval: Self.dockEdgePollInterval, repeats: true) { [weak self] _ in
+            guard let self, self.isEnabled else { return }
+            guard DockEdge.current() != self.cachedDockEdge else { return }
+            self.refreshScreenCache()
+        }
+        dockEdgePollTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func stopDockEdgePolling() {
+        dockEdgePollTimer?.invalidate()
+        dockEdgePollTimer = nil
+    }
+
     fileprivate func processEvent(_ event: CGEvent, type: CGEventType) -> Unmanaged<CGEvent>? {
         // Re-enable if macOS auto-disabled the tap
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
@@ -145,23 +233,15 @@ final class DockMonitor {
 
         guard isEnabled else { return Unmanaged.passUnretained(event) }
 
-        // Allow free movement while override modifier is held
         if let flag = overrideFlag, event.flags.contains(flag) {
             return Unmanaged.passUnretained(event)
         }
 
         let loc = event.location
 
-        for s in blockedScreens {
-            guard loc.x >= s.cgLeft, loc.x < s.cgRight else { continue }
-
-            // Within 5 px of the bottom edge → nudge cursor up
-            if loc.y >= s.cgBottom - 5 && loc.y <= s.cgBottom + 2 {
-                var nudged = loc
-                nudged.y = s.cgBottom - 7
-                event.location = nudged
-                return Unmanaged.passUnretained(event)
-            }
+        for zone in blockedZones where zone.contains(loc) {
+            event.location = zone.nudgedPoint(from: loc)
+            return Unmanaged.passUnretained(event)
         }
 
         return Unmanaged.passUnretained(event)

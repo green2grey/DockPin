@@ -6,12 +6,16 @@ final class SetupWindowController: NSWindowController, NSTextFieldDelegate {
     private let nameField = NSTextField(string: "")
     private let displaysStack = NSStackView()
     private let serialLessNoteRow = NSStackView()
+    private let dockEdgeLabel = NSTextField(wrappingLabelWithString: "")
+    private let layoutWarningLabel = NSTextField(wrappingLabelWithString: "")
     private let modifierPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let enableAfterSetupCheckbox = NSButton(checkboxWithTitle: "Enable DockPin after setup", target: nil, action: nil)
     private let cancelButton = NSButton(title: "Cancel", target: nil, action: nil)
     private let finishButton = NSButton(title: "Finish", target: nil, action: nil)
 
     private var displayCheckboxes: [(button: NSButton, descriptor: DisplayDescriptor)] = []
+    private var currentSnapshot = DisplaySnapshot(displays: [])
+    private var currentDockEdge: DockEdge = .bottom
 
     init() {
         let panel = NSPanel(
@@ -35,7 +39,10 @@ final class SetupWindowController: NSWindowController, NSTextFieldDelegate {
     }
 
     func present(snapshot: DisplaySnapshot) {
+        currentSnapshot = snapshot
+        currentDockEdge = DockEdge.current()
         refreshDisplays(snapshot: snapshot)
+        updateDockEdgeCopy()
         updateFinishEnabled()
 
         window?.center()
@@ -66,7 +73,6 @@ final class SetupWindowController: NSWindowController, NSTextFieldDelegate {
             root.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
         ])
 
-        // Profile name
         root.addArrangedSubview(sectionLabel("Profile Name"))
         nameField.placeholderString = "My Profile"
         nameField.bezelStyle = .roundedBezel
@@ -77,7 +83,6 @@ final class SetupWindowController: NSWindowController, NSTextFieldDelegate {
         nameField.widthAnchor.constraint(equalToConstant: 320).isActive = true
         root.addArrangedSubview(nameField)
 
-        // Displays
         root.addArrangedSubview(sectionLabel("Allow Dock on These Displays"))
         displaysStack.orientation = .vertical
         displaysStack.alignment = .leading
@@ -102,7 +107,17 @@ final class SetupWindowController: NSWindowController, NSTextFieldDelegate {
         serialLessNoteRow.addArrangedSubview(noteLabel)
         root.addArrangedSubview(serialLessNoteRow)
 
-        // Modifier
+        dockEdgeLabel.font = .systemFont(ofSize: 12)
+        dockEdgeLabel.textColor = .secondaryLabelColor
+        dockEdgeLabel.maximumNumberOfLines = 0
+        root.addArrangedSubview(dockEdgeLabel)
+
+        layoutWarningLabel.font = .systemFont(ofSize: 12)
+        layoutWarningLabel.textColor = .systemOrange
+        layoutWarningLabel.maximumNumberOfLines = 0
+        layoutWarningLabel.isHidden = true
+        root.addArrangedSubview(layoutWarningLabel)
+
         root.addArrangedSubview(sectionLabel("Override Modifier Key"))
         for opt in ModifierOption.allCases {
             modifierPopup.addItem(withTitle: opt.label)
@@ -111,11 +126,9 @@ final class SetupWindowController: NSWindowController, NSTextFieldDelegate {
         modifierPopup.selectItem(withTag: ModifierOption.option.rawValue)
         root.addArrangedSubview(modifierPopup)
 
-        // Enable after setup
         enableAfterSetupCheckbox.state = .off
         root.addArrangedSubview(enableAfterSetupCheckbox)
 
-        // Buttons
         let buttons = NSStackView()
         buttons.orientation = .horizontal
         buttons.alignment = .centerY
@@ -166,6 +179,7 @@ final class SetupWindowController: NSWindowController, NSTextFieldDelegate {
         }
 
         updateSerialLessNoteVisibility()
+        updateLayoutWarning()
     }
 
     private func selectedDisplays() -> [DisplayDescriptor] {
@@ -184,12 +198,68 @@ final class SetupWindowController: NSWindowController, NSTextFieldDelegate {
         finishButton.isEnabled = !name.isEmpty && !selectedDisplays().isEmpty
     }
 
+    private func updateDockEdgeCopy() {
+        dockEdgeLabel.stringValue =
+            "Current macOS Dock edge: \(currentDockEdge.label). DockPin can only keep the Dock on displays with an exposed \(currentDockEdge.requirementDescription)."
+    }
+
+    private func currentReachabilityMap() -> [CGDirectDisplayID: DisplayEdgeReachability] {
+        DisplayLayoutAnalyzer.reachabilityMap(snapshot: currentSnapshot, edge: currentDockEdge)
+    }
+
+    private func updateLayoutWarning() {
+        let reachability = currentReachabilityMap()
+        let blocked = selectedDisplays()
+            .filter { descriptor in
+                guard let info = reachability[descriptor.displayID] else { return false }
+                return !info.isReachable
+            }
+            .map(\.localizedName)
+
+        guard !blocked.isEmpty else {
+            layoutWarningLabel.isHidden = true
+            layoutWarningLabel.stringValue = ""
+            return
+        }
+
+        let names = blocked.joined(separator: ", ")
+        layoutWarningLabel.stringValue =
+            "\(currentDockEdge.label) edge is blocked on \(names). Rearrange displays or switch macOS Dock position to a different edge before enabling DockPin for that display."
+        layoutWarningLabel.isHidden = false
+    }
+
+    private func hasReachableSelectedDisplay() -> Bool {
+        let reachability = currentReachabilityMap()
+        return selectedDisplays().contains { descriptor in
+            reachability[descriptor.displayID]?.isReachable == true
+        }
+    }
+
+    private func showBlockedEnableAlert() {
+        let reachability = currentReachabilityMap()
+        let blocked = selectedDisplays()
+            .filter { descriptor in
+                reachability[descriptor.displayID]?.isReachable == false
+            }
+            .map(\.localizedName)
+        let summary = blocked.prefix(3).joined(separator: ", ")
+        let suffix = blocked.count > 3 ? ", +\(blocked.count - 3) more" : ""
+
+        let alert = NSAlert()
+        alert.messageText = "Enable after setup needs an exposed \(currentDockEdge.requirementDescription)."
+        alert.informativeText =
+            "Either uncheck \"Enable DockPin after setup\", rearrange your displays, or change the macOS Dock position before continuing. Blocked: \(summary)\(suffix)."
+        alert.alertStyle = .informational
+        alert.runModal()
+    }
+
     func controlTextDidChange(_ obj: Notification) {
         updateFinishEnabled()
     }
 
     @objc private func controlDidChange() {
         updateSerialLessNoteVisibility()
+        updateLayoutWarning()
         updateFinishEnabled()
     }
 
@@ -201,6 +271,10 @@ final class SetupWindowController: NSWindowController, NSTextFieldDelegate {
         let name = nameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         let selected = selectedDisplays()
         guard !name.isEmpty, !selected.isEmpty else { return }
+        if enableAfterSetupCheckbox.state == .on, !hasReachableSelectedDisplay() {
+            showBlockedEnableAlert()
+            return
+        }
 
         let allowed = Set(selected.map(\.stableID))
         let opt = ModifierOption(rawValue: modifierPopup.selectedTag()) ?? .option
@@ -210,4 +284,3 @@ final class SetupWindowController: NSWindowController, NSTextFieldDelegate {
         window?.close()
     }
 }
-
