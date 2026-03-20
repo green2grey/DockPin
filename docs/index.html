@@ -584,6 +584,56 @@
     letter-spacing: 0.3px;
   }
 
+  /* ── Legal ── */
+  .legal-section {
+    padding: 72px 24px;
+    max-width: 960px;
+    margin: 0 auto;
+    border-top: 2px solid var(--border);
+  }
+  .legal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+  .legal-block {
+    padding: 32px;
+    border: 1px solid var(--border);
+    margin-top: -1px;
+    margin-left: -1px;
+  }
+  .legal-block-title {
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+  }
+  .legal-block p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.8;
+    margin-bottom: 14px;
+  }
+  .legal-block p:last-child {
+    margin-bottom: 0;
+  }
+  .legal-block a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .legal-block a:hover {
+    color: var(--accent-hover);
+  }
+  .legal-updated {
+    margin-top: 20px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+
   /* ── Footer ── */
   footer {
     border-top: 2px solid var(--border);
@@ -648,6 +698,8 @@
     .whats-new-inner { grid-template-columns: 1fr; gap: 24px; }
     .whats-new-heading { font-size: 40px; }
     .requirements { padding: 32px 16px; }
+    .legal-section { padding: 52px 16px; }
+    .legal-grid { grid-template-columns: 1fr; }
     footer { flex-direction: column; gap: 12px; text-align: center; padding: 24px 16px; }
   }
 </style>
@@ -659,6 +711,7 @@
   <nav class="topbar-links">
     <a href="https://github.com/green2grey/DockPin" target="_blank" rel="noopener noreferrer">Source</a>
     <a href="https://github.com/green2grey/DockPin/releases/latest">Download</a>
+    <a href="#legal">Privacy &amp; Terms</a>
   </nav>
 </div>
 
@@ -907,10 +960,30 @@
   <p>Requires macOS 13 or later // Two or more displays // Dock on the left, bottom, or right edge // Displays have separate Spaces enabled in System Settings</p>
 </section>
 
+<section class="legal-section" id="legal">
+  <div class="section-label">Privacy &amp; Terms</div>
+  <div class="legal-grid">
+    <div class="legal-block">
+      <div class="legal-block-title">Privacy Policy</div>
+      <p>DockPin does not collect, store, transmit, or share any personal data. The app runs entirely on your Mac and does not communicate with any external servers. No analytics, telemetry, or crash reporting data is collected.</p>
+      <p>DockPin requires macOS Accessibility permission solely to manage Dock placement across your displays. This permission is never used to monitor, record, or transmit any user activity.</p>
+      <p>Automatic update checks are handled by the <a href="https://sparkle-project.org" target="_blank" rel="noopener noreferrer">Sparkle</a> framework, which connects to GitHub to check for new releases. No personally identifiable information is sent during this process.</p>
+    </div>
+    <div class="legal-block">
+      <div class="legal-block-title">Terms of Service</div>
+      <p>DockPin is provided &ldquo;as is&rdquo; under the <a href="https://github.com/green2grey/DockPin/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>, without warranty of any kind, express or implied. Use of this software is at your own risk. The developer is not liable for any damages arising from installation or use of this app.</p>
+      <p>DockPin is free and open-source software. The full source code is available at <a href="https://github.com/green2grey/DockPin" target="_blank" rel="noopener noreferrer">github.com/green2grey/DockPin</a>.</p>
+      <p>These terms may be updated from time to time. Continued use of the app constitutes acceptance of any changes.</p>
+      <p class="legal-updated">Last updated: March 2026</p>
+    </div>
+  </div>
+</section>
+
 <footer>
   <span>Made by <a href="https://github.com/green2grey" target="_blank" rel="noopener noreferrer">green2grey</a></span>
   <div class="footer-links">
     <a href="https://github.com/green2grey/DockPin" target="_blank" rel="noopener noreferrer">GitHub</a>
+    <a href="#legal">Privacy &amp; Terms</a>
     <span>Updates automatically</span>
   </div>
 </footer>
