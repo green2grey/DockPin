@@ -8,6 +8,16 @@ BUNDLE="$BUILD/$APP.app"
 CONTENTS="$BUNDLE/Contents"
 SIGN_ID="${DOCKPIN_SIGN_ID:?Set DOCKPIN_SIGN_ID to your Developer ID signing identity}"
 
+if ! command -v security >/dev/null 2>&1; then
+    echo "ERROR: macOS security command not found. Run this script on macOS with Xcode command line tools installed." >&2
+    exit 1
+fi
+
+if ! command -v codesign >/dev/null 2>&1; then
+    echo "ERROR: macOS codesign command not found. Run this script on macOS with Xcode command line tools installed." >&2
+    exit 1
+fi
+
 if ! security find-identity -v -p codesigning | grep -Fq "$SIGN_ID"; then
     echo "ERROR: signing identity not found: $SIGN_ID" >&2
     echo "Available code signing identities:" >&2
