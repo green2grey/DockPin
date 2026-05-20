@@ -1,5 +1,6 @@
 import Cocoa
 import CoreGraphics
+import os
 
 // MARK: - Modifier key override option
 
@@ -33,7 +34,7 @@ enum ModifierOption: Int, CaseIterable, Codable, Sendable {
 
 // MARK: - Cached screen geometry
 
-struct DockTriggerZone {
+struct DockTriggerZone: Sendable {
     let edge: DockEdge
     let minX: CGFloat
     let maxX: CGFloat
@@ -61,31 +62,37 @@ struct DockTriggerZone {
 
 // MARK: - DockMonitor
 
+@MainActor
 final class DockMonitor {
-    private static let dockEdgePollInterval: TimeInterval = 0.5
-
     var allowedDisplays: Set<CGDirectDisplayID> = []
     var overrideModifier: ModifierOption = .option
     private(set) var isEnabled = false
+    var onDockEdgeChanged: (() -> Void)?
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var dockEdgePollTimer: Timer?
-    /// Written on main thread, read in event tap callback.
-    fileprivate var blockedZones: [DockTriggerZone] = []
-    fileprivate var cachedDockEdge: DockEdge = .bottom
-    fileprivate var overrideFlag: CGEventFlags? = CGEventFlags.maskAlternate
+    private var dockPreferenceObserver: NSObjectProtocol?
+    private nonisolated(unsafe) var stateLock = os_unfair_lock_s()
+    private nonisolated(unsafe) var tapState = TapState()
+
+    private struct TapState {
+        var isEnabled = false
+        var blockedZones: [DockTriggerZone] = []
+        var cachedDockEdge: DockEdge = .bottom
+        var overrideFlag: CGEventFlags? = CGEventFlags.maskAlternate
+        var eventTap: CFMachPort?
+    }
 
     // MARK: - Public
 
     @discardableResult
     func startLocking() -> Bool {
         guard !isEnabled else { return true }
-        overrideFlag = overrideModifier.cgFlag
         refreshScreenCache()
         if installEventTap() {
             isEnabled = true
-            startDockEdgePolling()
+            refreshScreenCache()
+            startDockEdgeNotifications()
             return true
         }
         return false
@@ -94,25 +101,32 @@ final class DockMonitor {
     func stopLocking() {
         guard isEnabled else { return }
         isEnabled = false
-        stopDockEdgePolling()
+        stopDockEdgeNotifications()
+        refreshScreenCache()
         removeEventTap()
     }
 
     func refreshScreenCache() {
         let dockEdge = DockEdge.current()
-        cachedDockEdge = dockEdge
         let primaryH = CGDisplayBounds(CGMainDisplayID()).height
         let snapshot = DisplaySnapshot.current()
         let reachability = DisplayLayoutAnalyzer.reachabilityMap(snapshot: snapshot, edge: dockEdge)
         let reachableAllowedDisplays = Set(allowedDisplays.filter { reachability[$0]?.isReachable == true })
 
+        var nextState = TapState(
+            isEnabled: isEnabled,
+            blockedZones: [],
+            cachedDockEdge: dockEdge,
+            overrideFlag: overrideModifier.cgFlag,
+            eventTap: eventTap
+        )
+
         guard !reachableAllowedDisplays.isEmpty else {
-            blockedZones = []
-            overrideFlag = overrideModifier.cgFlag
+            commitTapState(nextState)
             return
         }
 
-        blockedZones = snapshot.filtered(for: .ignoreMirroredSecondaries)
+        nextState.blockedZones = snapshot.filtered(for: .ignoreMirroredSecondaries)
             .filter { !reachableAllowedDisplays.contains($0.displayID) }
             .flatMap { descriptor -> [DockTriggerZone] in
                 guard let info = reachability[descriptor.displayID] else { return [] }
@@ -125,7 +139,7 @@ final class DockMonitor {
                     )
                 }
             }
-        overrideFlag = overrideModifier.cgFlag
+        commitTapState(nextState)
     }
 
     private func zone(
@@ -201,45 +215,72 @@ final class DockMonitor {
     }
 
     private func removeEventTap() {
-        if let tap = eventTap { CGEvent.tapEnable(tap: tap, enable: false) }
+        if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+        }
         if let src = runLoopSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), src, .commonModes) }
         eventTap = nil
         runLoopSource = nil
+        refreshScreenCache()
     }
 
-    private func startDockEdgePolling() {
-        guard dockEdgePollTimer == nil else { return }
-
-        let timer = Timer(timeInterval: Self.dockEdgePollInterval, repeats: true) { [weak self] _ in
-            guard let self, self.isEnabled else { return }
-            guard DockEdge.current() != self.cachedDockEdge else { return }
-            self.refreshScreenCache()
+    private func startDockEdgeNotifications() {
+        guard dockPreferenceObserver == nil else { return }
+        dockPreferenceObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.apple.dock.prefchanged"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.isEnabled else { return }
+                let previousEdge = self.currentTapState().cachedDockEdge
+                self.refreshScreenCache()
+                if DockEdge.current() != previousEdge {
+                    self.onDockEdgeChanged?()
+                }
+            }
         }
-        dockEdgePollTimer = timer
-        RunLoop.main.add(timer, forMode: .common)
     }
 
-    private func stopDockEdgePolling() {
-        dockEdgePollTimer?.invalidate()
-        dockEdgePollTimer = nil
+    private func stopDockEdgeNotifications() {
+        if let observer = dockPreferenceObserver {
+            DistributedNotificationCenter.default().removeObserver(observer)
+        }
+        dockPreferenceObserver = nil
     }
 
-    fileprivate func processEvent(_ event: CGEvent, type: CGEventType) -> Unmanaged<CGEvent>? {
+    private nonisolated(unsafe) func commitTapState(_ state: TapState) {
+        os_unfair_lock_lock(&stateLock)
+        tapState = state
+        os_unfair_lock_unlock(&stateLock)
+    }
+
+    fileprivate nonisolated(unsafe) func currentTapState() -> TapState {
+        os_unfair_lock_lock(&stateLock)
+        let state = tapState
+        os_unfair_lock_unlock(&stateLock)
+        return state
+    }
+
+    fileprivate nonisolated(unsafe) func processEvent(_ event: CGEvent, type: CGEventType) -> Unmanaged<CGEvent>? {
+        let state = currentTapState()
+
         // Re-enable if macOS auto-disabled the tap
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            if let tap = eventTap { CGEvent.tapEnable(tap: tap, enable: true) }
+            if let tap = state.eventTap { CGEvent.tapEnable(tap: tap, enable: true) }
             return Unmanaged.passUnretained(event)
         }
 
-        guard isEnabled else { return Unmanaged.passUnretained(event) }
+        guard state.isEnabled else { return Unmanaged.passUnretained(event) }
 
-        if let flag = overrideFlag, event.flags.contains(flag) {
+        if let flag = state.overrideFlag, event.flags.contains(flag) {
             return Unmanaged.passUnretained(event)
         }
 
         let loc = event.location
 
-        for zone in blockedZones where zone.contains(loc) {
+        for zone in state.blockedZones where zone.contains(loc) {
             event.location = zone.nudgedPoint(from: loc)
             return Unmanaged.passUnretained(event)
         }

@@ -5,13 +5,13 @@ struct EdgeInterval: Sendable {
     var end: CGFloat
 
     init(start: CGFloat, end: CGFloat) {
-        assert(end >= start, "EdgeInterval end must be >= start")
+        precondition(end >= start, "EdgeInterval end must be >= start")
         self.start = start
         self.end = end
     }
 
     var length: CGFloat {
-        assert(end >= start, "EdgeInterval end must be >= start")
+        precondition(end >= start, "EdgeInterval end must be >= start")
         return end - start
     }
 }

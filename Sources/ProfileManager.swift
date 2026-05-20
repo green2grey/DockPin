@@ -73,10 +73,13 @@ final class ProfileManager {
     }
 
     func load() {
-        if let data = defaults.data(forKey: Key.profiles),
-           let decoded = try? decoder.decode([DockProfile].self, from: data)
-        {
-            profiles = decoded
+        if let data = defaults.data(forKey: Key.profiles) {
+            do {
+                profiles = try decoder.decode([DockProfile].self, from: data)
+            } catch {
+                logger.error("Failed to decode profiles: \(error.localizedDescription, privacy: .public)")
+                profiles = []
+            }
         } else {
             profiles = []
         }
@@ -191,8 +194,11 @@ final class ProfileManager {
     }
 
     private func persistProfiles() {
-        if let data = try? encoder.encode(profiles) {
+        do {
+            let data = try encoder.encode(profiles)
             defaults.set(data, forKey: Key.profiles)
+        } catch {
+            logger.error("Failed to encode profiles: \(error.localizedDescription, privacy: .public)")
         }
     }
 }

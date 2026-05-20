@@ -1,11 +1,22 @@
 import AppKit
 import ServiceManagement
 import Sparkle
+import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem!
+    private let statusBarModel = StatusBarModel()
+    private lazy var statusPopover: NSPopover = {
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentSize = NSSize(width: 360, height: 600)
+        popover.contentViewController = NSHostingController(
+            rootView: DockPinPopoverView(model: statusBarModel, actions: self)
+        )
+        return popover
+    }()
     private var helpWindow: NSWindow?
     private var setupWindowController: SetupWindowController?
     private var autoSwitchTask: Task<Void, Never>?
@@ -30,6 +41,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusBar()
+        monitor.onDockEdgeChanged = { [weak self] in
+            self?.applyCurrentState(snapshot: .current())
+        }
 
         NotificationCenter.default.addObserver(
             self,
@@ -46,12 +60,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateIcon()
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        NotificationCenter.default.removeObserver(self)
+        dockReanchorer.cancel()
+        monitor.stopLocking()
+    }
+
     // MARK: - Status Bar
 
     private func setupStatusBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         updateIcon()
-        statusItem.menu = buildMenu()
+        if let button = statusItem.button {
+            button.target = self
+            button.action = #selector(toggleStatusPopover(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        }
     }
 
     private func updateIcon() {
@@ -83,209 +107,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         img?.isTemplate = true
         button.image = img
         button.toolTip = tooltip
+        button.setAccessibilityLabel(tooltip)
     }
 
-    // MARK: - Menu
-
-    private func buildMenu() -> NSMenu {
-        let menu = NSMenu()
-        menu.delegate = self
-        menu.autoenablesItems = false
-        return menu
+    @objc private func toggleStatusPopover(_ sender: NSStatusBarButton) {
+        refreshStatusBarModel(snapshot: .current())
+        if statusPopover.isShown {
+            statusPopover.performClose(sender)
+        } else {
+            statusPopover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+            statusPopover.contentViewController?.view.window?.makeKey()
+        }
     }
 
-    fileprivate func populateMenu(_ menu: NSMenu) {
-        menu.removeAllItems()
-
-        let snapshot = DisplaySnapshot.current()
-        let configured = isConfigured
-        let active = profileManager.activeProfile
-        let dockEdge = DockEdge.current()
-        let reachability = DisplayLayoutAnalyzer.reachabilityMap(
-            snapshot: snapshot,
-            edge: dockEdge,
-            mirroringPolicy: active?.mirroringPolicy ?? .ignoreMirroredSecondaries
-        )
-
-        // ── Header ──
-        let hdrTitle: String = {
-            guard configured, let active else { return "DockPin" }
-            return "DockPin -- \(active.name)"
-        }()
-        let hdr = NSMenuItem(title: hdrTitle, action: nil, keyEquivalent: "")
-        hdr.isEnabled = false
-        menu.addItem(hdr)
-
-        menu.addItem(.separator())
-
-        if !configured {
-            let setup = NSMenuItem(title: "Set Up...", action: #selector(showSetup), keyEquivalent: "")
-            setup.target = self
-            if #available(macOS 14.0, *) {
-                setup.badge = .newItems(count: 1)
-            }
-            menu.addItem(setup)
-            menu.addItem(.separator())
+    private func closeStatusPopover() {
+        if statusPopover.isShown {
+            statusPopover.performClose(nil)
         }
-
-        // ── Enable / Disable ──
-        let toggle = NSMenuItem(
-            title: (active?.isEnabled == true) ? "Disable DockPin" : "Enable DockPin",
-            action: #selector(toggleEnabled),
-            keyEquivalent: "e"
-        )
-        toggle.keyEquivalentModifierMask = [.command]
-        toggle.target = self
-        let resolvedAllowed: Set<CGDirectDisplayID> = {
-            guard let active else { return [] }
-            return profileManager.resolveAllowedDisplayIDs(for: active, snapshot: snapshot)
-        }()
-        let toggleDisabledReason = toggleEnableDisabledReason(
-            activeProfile: active,
-            resolvedAllowed: resolvedAllowed,
-            dockEdge: dockEdge,
-            reachability: reachability
-        )
-        toggle.isEnabled = toggleDisabledReason == nil
-        toggle.toolTip = toggleDisabledReason
-        menu.addItem(toggle)
-
-        menu.addItem(.separator())
-
-        let edgeInfo = NSMenuItem(title: "Current Dock Edge: \(dockEdge.label)", action: nil, keyEquivalent: "")
-        edgeInfo.isEnabled = false
-        menu.addItem(edgeInfo)
-
-        menu.addItem(.separator())
-
-        // ── Override modifier key ──
-        let modItem = NSMenuItem(title: "Override Modifier Key", action: nil, keyEquivalent: "")
-        let modMenu = NSMenu()
-        for mod in ModifierOption.allCases {
-            let mi = NSMenuItem(title: mod.label, action: #selector(pickModifier(_:)), keyEquivalent: "")
-            mi.target = self
-            mi.tag = mod.rawValue
-            mi.state = (active?.overrideModifier == mod) ? .on : .off
-            modMenu.addItem(mi)
-        }
-        modItem.submenu = modMenu
-        modItem.isEnabled = configured
-        menu.addItem(modItem)
-
-        menu.addItem(.separator())
-
-        // ── Allow Dock on Display ──
-        let allowItem = NSMenuItem(title: "Allow Dock on Display", action: nil, keyEquivalent: "")
-        let allowMenu = NSMenu()
-        let displays = snapshot.displays.filter { !$0.isMirroredSecondary }
-        if displays.count < 2 {
-            let note = NSMenuItem(title: "Connect a second display to use DockPin", action: nil, keyEquivalent: "")
-            note.isEnabled = false
-            allowMenu.addItem(note)
-        }
-        for d in displays {
-            let isReachable = reachability[d.displayID]?.isReachable ?? true
-            let title = isReachable ? d.localizedName : "\(d.localizedName) (current edge blocked)"
-            let mi = NSMenuItem(title: title, action: #selector(toggleAllow(_:)), keyEquivalent: "")
-            mi.target = self
-            mi.representedObject = d.stableID
-            mi.image = Self.displayIcon
-            mi.state = (active?.allowedDisplays.contains(d.stableID) == true) ? .on : .off
-            if !isReachable {
-                mi.toolTip = reachability[d.displayID]?.blockedReason
-            }
-            allowMenu.addItem(mi)
-        }
-        allowItem.submenu = allowMenu
-        allowItem.isEnabled = configured
-        menu.addItem(allowItem)
-
-        let reanchor = NSMenuItem(title: "Re-anchor Dock Now", action: #selector(reanchorDockNow), keyEquivalent: "")
-        reanchor.target = self
-        let plan = reanchorPlan(activeProfile: active, resolvedAllowed: resolvedAllowed, reachability: reachability)
-        reanchor.isEnabled = plan.target != nil
-        reanchor.toolTip = plan.disabledReason
-        menu.addItem(reanchor)
-
-        if let active, let warning = blockedSelectionSummary(
-            resolvedAllowed: resolvedAllowed,
-            snapshot: snapshot,
-            mirroringPolicy: active.mirroringPolicy,
-            dockEdge: dockEdge,
-            reachability: reachability
-        ) {
-            let warningItem = NSMenuItem(title: warning, action: nil, keyEquivalent: "")
-            warningItem.isEnabled = false
-            menu.addItem(warningItem)
-        }
-
-        menu.addItem(.separator())
-
-        // ── Profiles ──
-        let profilesItem = NSMenuItem(title: "Profiles", action: nil, keyEquivalent: "")
-        let profilesMenu = NSMenu()
-        for p in profileManager.profiles {
-            let mi = NSMenuItem(title: p.name, action: #selector(selectProfile(_:)), keyEquivalent: "")
-            mi.target = self
-            mi.representedObject = p.id
-            mi.state = (p.id == profileManager.activeProfileID) ? .on : .off
-            profilesMenu.addItem(mi)
-        }
-        if !profileManager.profiles.isEmpty {
-            profilesMenu.addItem(.separator())
-        }
-
-        let autoSwitch = NSMenuItem(title: "Auto-switch Profiles", action: #selector(toggleAutoSwitch), keyEquivalent: "")
-        autoSwitch.target = self
-        autoSwitch.state = profileManager.autoSwitchEnabled ? .on : .off
-        profilesMenu.addItem(autoSwitch)
-
-        if profileManager.manualHoldEnabled {
-            let resume = NSMenuItem(title: "Resume Auto-switching", action: #selector(resumeAutoSwitching), keyEquivalent: "")
-            resume.target = self
-            profilesMenu.addItem(resume)
-        }
-
-        profilesMenu.addItem(.separator())
-
-        let saveCurrent = NSMenuItem(title: "Save Current as Profile...", action: #selector(saveCurrentAsProfile), keyEquivalent: "")
-        saveCurrent.target = self
-        profilesMenu.addItem(saveCurrent)
-
-        profilesItem.submenu = profilesMenu
-        profilesItem.isEnabled = configured && (active != nil)
-        menu.addItem(profilesItem)
-
-        menu.addItem(.separator())
-
-        // ── Check for Updates ──
-        let updateItem = NSMenuItem(
-            title: "Check for Updates...",
-            action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
-            keyEquivalent: ""
-        )
-        updateItem.target = updaterController
-        menu.addItem(updateItem)
-
-        // ── Help ──
-        let help = NSMenuItem(title: "Help...", action: #selector(showHelp), keyEquivalent: "?")
-        help.keyEquivalentModifierMask = [.command]
-        help.target = self
-        menu.addItem(help)
-
-        // ── Launch at Startup ──
-        let startup = NSMenuItem(title: "Launch at Startup", action: #selector(toggleStartup), keyEquivalent: "")
-        startup.target = self
-        startup.state = isLoginItemEnabled ? .on : .off
-        menu.addItem(startup)
-
-        menu.addItem(.separator())
-
-        // ── Quit ──
-        let quit = NSMenuItem(title: "Quit DockPin", action: #selector(quitApp), keyEquivalent: "q")
-        quit.keyEquivalentModifierMask = [.command]
-        quit.target = self
-        menu.addItem(quit)
     }
 
     // MARK: - Help content
@@ -385,12 +223,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return result
     }()
 
-    private static let displayIcon: NSImage? = {
-        let img = NSImage(systemSymbolName: "display", accessibilityDescription: nil)
-        img?.isTemplate = true
-        return img
-    }()
-
     // MARK: - Actions
 
     @objc private func toggleEnabled() {
@@ -430,9 +262,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateIcon()
     }
 
-    @objc private func toggleAllow(_ sender: NSMenuItem) {
+    private func toggleAllowedDisplay(_ stableID: DisplayStableID) {
         guard isConfigured, let active = profileManager.activeProfile else { return }
-        guard let stableID = sender.representedObject as? DisplayStableID else { return }
 
         if active.allowedDisplays.contains(stableID) {
             if active.allowedDisplays.count <= 1 {
@@ -447,19 +278,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyCurrentState(snapshot: .current(), attemptReanchor: true)
     }
 
-    @objc private func pickModifier(_ sender: NSMenuItem) {
+    private func setOverrideModifier(_ opt: ModifierOption) {
         guard isConfigured, let active = profileManager.activeProfile else { return }
-        let opt = ModifierOption(rawValue: sender.tag) ?? .option
         profileManager.updateProfile(id: active.id) { $0.overrideModifier = opt }
         applyCurrentState(snapshot: .current())
     }
 
-    @objc private func toggleStartup() {
+    private func toggleStartup() {
         if isLoginItemEnabled {
             try? SMAppService.mainApp.unregister()
         } else {
             try? SMAppService.mainApp.register()
         }
+        refreshStatusBarModel(snapshot: .current())
     }
 
     @objc private func showHelp() {
@@ -503,29 +334,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         helpWindow = w
     }
 
-    @objc private func showSetup() {
+    private func showSetup() {
         openSetupWindow()
     }
 
-    @objc private func selectProfile(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? UUID else { return }
+    private func selectProfile(id: UUID) {
         profileManager.setActiveProfile(id: id, manualHold: true)
         applyCurrentState(snapshot: .current(), attemptReanchor: true)
     }
 
-    @objc private func toggleAutoSwitch() {
+    private func toggleAutoSwitch() {
         profileManager.autoSwitchEnabled.toggle()
         if profileManager.autoSwitchEnabled {
             scheduleAutoSwitch()
         }
+        refreshStatusBarModel(snapshot: .current())
     }
 
-    @objc private func resumeAutoSwitching() {
+    private func resumeAutoSwitching() {
         profileManager.manualHoldEnabled = false
         scheduleAutoSwitch()
+        refreshStatusBarModel(snapshot: .current())
     }
 
-    @objc private func saveCurrentAsProfile() {
+    private func saveCurrentAsProfile() {
         guard isConfigured else { return }
 
         let alert = NSAlert()
@@ -560,7 +392,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         scheduleAutoSwitch()
     }
 
-    @objc private func reanchorDockNow() {
+    private func reanchorDockNow() {
         guard let active = profileManager.activeProfile else { return }
         let snapshot = DisplaySnapshot.current()
         let reachability = DisplayLayoutAnalyzer.reachabilityMap(
@@ -581,11 +413,62 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 }
 
-// MARK: - NSMenuDelegate – rebuild items each time the menu opens
+// MARK: - StatusBarActions
 
-extension AppDelegate: NSMenuDelegate {
-    func menuWillOpen(_ menu: NSMenu) {
-        populateMenu(menu)
+extension AppDelegate: StatusBarActions {
+    func statusBarToggleEnabled() {
+        toggleEnabled()
+    }
+
+    func statusBarToggleAllowedDisplay(_ stableID: DisplayStableID) {
+        toggleAllowedDisplay(stableID)
+    }
+
+    func statusBarSetOverrideModifier(_ modifier: ModifierOption) {
+        setOverrideModifier(modifier)
+    }
+
+    func statusBarSelectProfile(_ id: UUID) {
+        selectProfile(id: id)
+    }
+
+    func statusBarToggleAutoSwitch() {
+        toggleAutoSwitch()
+    }
+
+    func statusBarResumeAutoSwitching() {
+        resumeAutoSwitching()
+    }
+
+    func statusBarSaveCurrentAsProfile() {
+        saveCurrentAsProfile()
+    }
+
+    func statusBarReanchorDockNow() {
+        reanchorDockNow()
+    }
+
+    func statusBarShowSetup() {
+        closeStatusPopover()
+        showSetup()
+    }
+
+    func statusBarShowHelp() {
+        closeStatusPopover()
+        showHelp()
+    }
+
+    func statusBarCheckForUpdates() {
+        closeStatusPopover()
+        updaterController.checkForUpdates(nil)
+    }
+
+    func statusBarToggleStartup() {
+        toggleStartup()
+    }
+
+    func statusBarQuit() {
+        quitApp()
     }
 }
 
@@ -599,6 +482,58 @@ extension AppDelegate {
 
     private var isConfigured: Bool {
         profileManager.setupCompleted && !profileManager.profiles.isEmpty
+    }
+
+    private func refreshStatusBarModel(snapshot: DisplaySnapshot) {
+        let active = profileManager.activeProfile
+        let dockEdge = DockEdge.current()
+        let reachability = DisplayLayoutAnalyzer.reachabilityMap(
+            snapshot: snapshot,
+            edge: dockEdge,
+            mirroringPolicy: active?.mirroringPolicy ?? .ignoreMirroredSecondaries
+        )
+        let resolvedAllowed = active.map {
+            profileManager.resolveAllowedDisplayIDs(for: $0, snapshot: snapshot)
+        } ?? []
+        let reanchor = reanchorPlan(
+            activeProfile: active,
+            resolvedAllowed: resolvedAllowed,
+            reachability: reachability
+        )
+        let blockedSummary = active.flatMap {
+            blockedSelectionSummary(
+                resolvedAllowed: resolvedAllowed,
+                snapshot: snapshot,
+                mirroringPolicy: $0.mirroringPolicy,
+                dockEdge: dockEdge,
+                reachability: reachability
+            )
+        }
+
+        statusBarModel.update(
+            StatusBarState(
+                displaySnapshot: snapshot,
+                profiles: profileManager.profiles,
+                activeProfileID: profileManager.activeProfileID,
+                activeProfile: active,
+                dockEdge: dockEdge,
+                reachability: reachability,
+                resolvedAllowedDisplayIDs: resolvedAllowed,
+                isConfigured: isConfigured,
+                isAccessibilityTrusted: isAccessibilityTrusted(),
+                isLoginItemEnabled: isLoginItemEnabled,
+                autoSwitchEnabled: profileManager.autoSwitchEnabled,
+                manualHoldEnabled: profileManager.manualHoldEnabled,
+                toggleDisabledReason: toggleEnableDisabledReason(
+                    activeProfile: active,
+                    resolvedAllowed: resolvedAllowed,
+                    dockEdge: dockEdge,
+                    reachability: reachability
+                ),
+                reanchorDisabledReason: reanchor.disabledReason,
+                blockedSelectionSummary: blockedSummary
+            )
+        )
     }
 
     private func promptAccessibilityIfNeeded() {
@@ -701,6 +636,7 @@ extension AppDelegate {
             dockReanchorer.cancel()
             monitor.stopLocking()
             monitor.allowedDisplays.removeAll()
+            refreshStatusBarModel(snapshot: snapshot)
             updateIcon()
             return
         }
@@ -743,6 +679,7 @@ extension AppDelegate {
         }
 
         updateIcon()
+        refreshStatusBarModel(snapshot: snapshot)
     }
 
     private func v1KeysPresent() -> Bool {

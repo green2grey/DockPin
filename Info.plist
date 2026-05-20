@@ -9,9 +9,9 @@
     <key>CFBundleIdentifier</key>
     <string>com.green2grey.DockPin</string>
     <key>CFBundleVersion</key>
-    <string>210</string>
+    <string>220</string>
     <key>CFBundleShortVersionString</key>
-    <string>2.1</string>
+    <string>2.2</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
@@ -22,8 +22,18 @@
     <true/>
     <key>CFBundleIconFile</key>
     <string>DockPin</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.utilities</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>© 2025 green2grey. MIT License.</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>DockPin needs Accessibility access to detect when the cursor crosses into a disallowed display so it can keep the Dock pinned where you chose.</string>
     <key>SUFeedURL</key>
     <string>https://green2grey.github.io/DockPin/appcast.xml</string>
     <key>SUPublicEDKey</key>

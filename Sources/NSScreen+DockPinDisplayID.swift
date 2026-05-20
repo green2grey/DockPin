@@ -3,7 +3,10 @@ import CoreGraphics
 
 extension NSScreen {
     var dockPinDisplayID: CGDirectDisplayID? {
-        // NSScreen.cgDirectDisplayID may not be available on our deployment target (macOS 13+).
+        if #available(macOS 14.0, *) {
+            return cgDirectDisplayID
+        }
+
         let key = NSDeviceDescriptionKey("NSScreenNumber")
         if let num = deviceDescription[key] as? NSNumber {
             return CGDirectDisplayID(num.uint32Value)
