@@ -10,6 +10,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var setupWindowController: SetupWindowController?
     private var autoSwitchTask: Task<Void, Never>?
     private var screenChangeTick = 0
+    private var recoveryTask: Task<Void, Never>?
+    private var sessionLocked = false
+    private var sessionInactive = false
+    private var systemAsleep = false
+    private var sessionUnavailable: Bool { sessionLocked || sessionInactive || systemAsleep }
 
     let monitor = DockMonitor()
     private let dockReanchorer = DockReanchorer()
@@ -38,10 +43,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil
         )
 
+        let workspaceNotifications = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.didWakeNotification, NSWorkspace.screensDidWakeNotification,
+                     NSWorkspace.sessionDidBecomeActiveNotification] {
+            workspaceNotifications.addObserver(self, selector: #selector(resumeSession), name: name, object: nil)
+        }
+        for name in [NSWorkspace.willSleepNotification, NSWorkspace.sessionDidResignActiveNotification] {
+            workspaceNotifications.addObserver(self, selector: #selector(suspendSession), name: name, object: nil)
+        }
+        let distributedNotifications = DistributedNotificationCenter.default()
+        distributedNotifications.addObserver(self, selector: #selector(resumeSession),
+                                             name: NSNotification.Name("com.apple.screenIsUnlocked"), object: nil)
+        distributedNotifications.addObserver(self, selector: #selector(suspendSession),
+                                             name: NSNotification.Name("com.apple.screenIsLocked"), object: nil)
+
         promptAccessibilityIfNeeded()
         handleV1ResetNoticeIfNeeded()
 
         applyCurrentState(snapshot: .current())
+        scheduleRecovery()
 
         updateIcon()
     }
@@ -550,27 +570,69 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func quitApp() {
+        recoveryTask?.cancel()
         dockReanchorer.cancel()
         monitor.stopLocking()
         NSApp.terminate(nil)
     }
 
     @objc private func screensChanged() {
-        applyCurrentState(snapshot: .current(), attemptReanchor: true)
+        applyCurrentState(snapshot: .current())
         scheduleAutoSwitch()
+        scheduleRecovery()
+    }
+
+    @objc private func suspendSession(_ notification: Notification) {
+        switch notification.name {
+        case NSWorkspace.willSleepNotification: systemAsleep = true
+        case NSWorkspace.sessionDidResignActiveNotification: sessionInactive = true
+        default: sessionLocked = true
+        }
+        recoveryTask?.cancel()
+        recoveryTask = nil
+        dockReanchorer.cancel()
+    }
+
+    @objc private func resumeSession(_ notification: Notification) {
+        switch notification.name {
+        case NSWorkspace.didWakeNotification, NSWorkspace.screensDidWakeNotification: systemAsleep = false
+        case NSWorkspace.sessionDidBecomeActiveNotification: sessionInactive = false
+        default: sessionLocked = false
+        }
+        scheduleRecovery()
+    }
+
+    private func scheduleRecovery() {
+        recoveryTask?.cancel()
+        dockReanchorer.cancel()
+        guard !sessionUnavailable else { return }
+        recoveryTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(1))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled, let self else { return }
+            self.recoveryTask = nil
+            self.applyCurrentState(snapshot: .current(), attemptReanchor: true)
+        }
     }
 
     @objc private func reanchorDockNow() {
-        guard let active = profileManager.activeProfile else { return }
-        let snapshot = DisplaySnapshot.current()
-        let reachability = DisplayLayoutAnalyzer.reachabilityMap(
-            snapshot: snapshot,
-            edge: DockEdge.current(),
-            mirroringPolicy: active.mirroringPolicy
-        )
-        let resolvedAllowed = profileManager.resolveAllowedDisplayIDs(for: active, snapshot: snapshot)
-        guard let target = reanchorPlan(activeProfile: active, resolvedAllowed: resolvedAllowed, reachability: reachability).target else { return }
-        dockReanchorer.reanchor(to: target)
+        dockReanchorer.reanchor { [weak self] in
+            guard let self, !self.sessionUnavailable, self.isConfigured,
+                  self.monitor.isEnabled, self.isAccessibilityTrusted(),
+                  let active = self.profileManager.activeProfile else { return nil }
+            let snapshot = DisplaySnapshot.current()
+            let reachability = DisplayLayoutAnalyzer.reachabilityMap(
+                snapshot: snapshot,
+                edge: DockEdge.current(),
+                mirroringPolicy: active.mirroringPolicy
+            )
+            let resolvedAllowed = self.profileManager.resolveAllowedDisplayIDs(for: active, snapshot: snapshot)
+            return self.reanchorPlan(activeProfile: active, resolvedAllowed: resolvedAllowed,
+                                     reachability: reachability).target
+        }
     }
 
     // MARK: - Helpers
@@ -697,6 +759,9 @@ extension AppDelegate {
     }
 
     private func applyCurrentState(snapshot: DisplaySnapshot, attemptReanchor: Bool = false) {
+        recoveryTask?.cancel()
+        recoveryTask = nil
+        dockReanchorer.cancel()
         guard isConfigured else {
             dockReanchorer.cancel()
             monitor.stopLocking()
@@ -735,11 +800,7 @@ extension AppDelegate {
         }
 
         if attemptReanchor, active.isEnabled, monitor.isEnabled {
-            if let target = reanchorPlan(activeProfile: active, resolvedAllowed: resolvedAllowed, reachability: reachability).target {
-                dockReanchorer.reanchor(to: target)
-            } else {
-                dockReanchorer.cancel()
-            }
+            reanchorDockNow()
         }
 
         updateIcon()
