@@ -48,7 +48,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                      NSWorkspace.sessionDidBecomeActiveNotification] {
             workspaceNotifications.addObserver(self, selector: #selector(resumeSession), name: name, object: nil)
         }
-        for name in [NSWorkspace.willSleepNotification, NSWorkspace.sessionDidResignActiveNotification] {
+        for name in [NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification,
+                     NSWorkspace.sessionDidResignActiveNotification] {
             workspaceNotifications.addObserver(self, selector: #selector(suspendSession), name: name, object: nil)
         }
         let distributedNotifications = DistributedNotificationCenter.default()
@@ -584,7 +585,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func suspendSession(_ notification: Notification) {
         switch notification.name {
-        case NSWorkspace.willSleepNotification: systemAsleep = true
+        case NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification: systemAsleep = true
         case NSWorkspace.sessionDidResignActiveNotification: sessionInactive = true
         default: sessionLocked = true
         }
