@@ -3,6 +3,47 @@
     <channel>
         <title>DockPin</title>
         <item>
+            <title>2.2</title>
+            <pubDate>Tue, 10 Nov 2026 22:02:15 +0000</pubDate>
+            <sparkle:version>220</sparkle:version>
+            <sparkle:shortVersionString>2.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:fullReleaseNotesLink>https://github.com/green2grey/DockPin/releases/tag/v2.2</sparkle:fullReleaseNotesLink>
+            <description><![CDATA[
+<style>:root{color-scheme:light dark}body{font:13px -apple-system,sans-serif;margin:14px}h3{font-size:13px;margin:14px 0 4px}h3:first-of-type{margin-top:0}ul{margin:0;padding-left:18px}li{margin:3px 0}</style>
+<h3>New</h3>
+<ul>
+<li>A Settings window. The menu is now short (pin, re-anchor, switch profile) and everything else lives in Settings, under Displays, Profiles and General.</li>
+<li>Hide the menu bar icon. Turn off "Show in menu bar" under Settings → General; open DockPin again from Applications or Spotlight to get back.</li>
+<li>Custom override key. Record any key, not only a modifier, to let the Dock move freely while you hold it.</li>
+<li>Rename and delete profiles, and choose which displays a profile belongs to.</li>
+<li>Updates are checked, downloaded and installed inside Settings, with a list of what's new.</li>
+<li>No setup wizard. DockPin starts with a profile for the display your Dock is on; just turn on Pin the Dock.</li>
+</ul>
+<h3>Improved</h3>
+<ul>
+<li>The menu bar icon shows what DockPin is doing: a filled pin only while the Dock is being held, and a warning when Accessibility access is missing.</li>
+<li>Granting Accessibility access takes effect within a couple of seconds, with no relaunch.</li>
+<li>The Dock is checked and put back after your Mac starts, wakes or unlocks.</li>
+<li>DockPin moves the pointer to re-anchor only when the Dock is on the wrong display, and waits while you're holding a mouse button.</li>
+<li>If you move the Dock yourself with the override key, DockPin leaves it there.</li>
+<li>DockPin stops cleanly if Accessibility access is removed while it's running.</li>
+<li>Launch at login reports problems instead of failing silently.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>Re-anchor Dock Now works again on current versions of macOS.</li>
+<li>Auto-switch Profiles now switches. Profiles from earlier versions learn their displays the first time you select them.</li>
+<li>The pointer could be left at the Dock edge when displays changed quickly.</li>
+<li>Saved profiles could be lost if DockPin couldn't read them.</li>
+<li>DockPin no longer tries to pin when "Displays have separate Spaces" is turned off.</li>
+<li>Copy and paste now work in DockPin's text fields.</li>
+</ul>
+]]></description>
+            <enclosure url="https://github.com/green2grey/DockPin/releases/download/v2.2/DockPin.zip" type="application/octet-stream" sparkle:edSignature="NvNHClI7LtYheiov5zAxiZei+Hk5ksSnGCyrxvEqw+KLbxQdCpD56AVdjS9OnGY5Qzydgnew0l3//6e69nGXCA==" length="2318743"/>
+        </item>
+        <item>
             <title>2.1</title>
             <pubDate>Fri, 13 Mar 2026 23:43:06 -0700</pubDate>
             <sparkle:version>210</sparkle:version>
