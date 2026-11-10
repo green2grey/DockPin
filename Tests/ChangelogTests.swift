@@ -181,9 +181,7 @@ private let repositoryRoot = URL(fileURLWithPath: #filePath).deletingLastPathCom
     }
 
     @Test func theVersionThatLastRanIsRemembered() {
-        let name = "DockPinTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: name)!
-        defer { defaults.removePersistentDomain(forName: name) }
+        let defaults = InMemoryDefaults()
 
         #expect(ProfileManager(defaults: defaults).lastRunVersion == nil)
         ProfileManager(defaults: defaults).lastRunVersion = "2.2"

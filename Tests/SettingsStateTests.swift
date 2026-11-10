@@ -218,16 +218,9 @@ private func state(
 }
 
 @Suite struct ProfileManagementTests {
-    private final class Scratch {
-        let name = "DockPinTests.\(UUID().uuidString)"
-        let defaults: UserDefaults
-        init() { defaults = UserDefaults(suiteName: name)! }
-        deinit { defaults.removePersistentDomain(forName: name) }
-    }
-
     @Test func renamingKeepsEverythingElse() throws {
-        let scratch = Scratch()
-        let manager = ProfileManager(defaults: scratch.defaults)
+        let scratch = InMemoryDefaults()
+        let manager = ProfileManager(defaults: scratch)
         let original = profile("Work")
         manager.addProfile(original)
 
@@ -237,12 +230,12 @@ private func state(
 
         manager.renameProfile(id: original.id, to: "   ")
         #expect(manager.profiles.first?.name == "Office")
-        #expect(ProfileManager(defaults: scratch.defaults).profiles.first?.name == "Office")
+        #expect(ProfileManager(defaults: scratch).profiles.first?.name == "Office")
     }
 
     @Test func newProfilesGetANameThatIsNotTaken() {
-        let scratch = Scratch()
-        let manager = ProfileManager(defaults: scratch.defaults)
+        let scratch = InMemoryDefaults()
+        let manager = ProfileManager(defaults: scratch)
         #expect(manager.unusedProfileName() == "Profile")
 
         manager.addProfile(profile("Profile"))
@@ -253,8 +246,8 @@ private func state(
     }
 
     @Test func relinkingReplacesTheTrigger() {
-        let scratch = Scratch()
-        let manager = ProfileManager(defaults: scratch.defaults)
+        let scratch = InMemoryDefaults()
+        let manager = ProfileManager(defaults: scratch)
         let work = profile("Work")
         manager.addProfile(work)
 
@@ -272,20 +265,20 @@ private func state(
     }
 
     @Test func displayNamesAreRememberedAfterUnplugging() {
-        let scratch = Scratch()
-        let manager = ProfileManager(defaults: scratch.defaults)
+        let scratch = InMemoryDefaults()
+        let manager = ProfileManager(defaults: scratch)
         manager.rememberDisplayNames(from: DisplaySnapshot(displays: [laptop, monitor]))
         manager.rememberDisplayNames(from: DisplaySnapshot(displays: [laptop]))
 
         #expect(manager.displayNames[monitorID.storageKey] == "ASUS PG32UQ")
-        #expect(ProfileManager(defaults: scratch.defaults).displayNames[monitorID.storageKey] == "ASUS PG32UQ")
+        #expect(ProfileManager(defaults: scratch).displayNames[monitorID.storageKey] == "ASUS PG32UQ")
     }
 
     @Test func theMenuBarIconPreferencePersists() {
-        let scratch = Scratch()
-        #expect(!ProfileManager(defaults: scratch.defaults).hidesMenuBarIcon)
-        ProfileManager(defaults: scratch.defaults).hidesMenuBarIcon = true
-        #expect(ProfileManager(defaults: scratch.defaults).hidesMenuBarIcon)
+        let scratch = InMemoryDefaults()
+        #expect(!ProfileManager(defaults: scratch).hidesMenuBarIcon)
+        ProfileManager(defaults: scratch).hidesMenuBarIcon = true
+        #expect(ProfileManager(defaults: scratch).hidesMenuBarIcon)
     }
 
     @Test func aStoredIDCoversTheRightDisplays() {
