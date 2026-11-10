@@ -26,6 +26,17 @@ struct DisplayStableID: Codable, Hashable, Sendable {
         VendorModelKey(vendorID: vendorID, modelID: modelID)
     }
 
+    /// A stable string form, used as a dictionary key in stored settings.
+    var storageKey: String {
+        "\(vendorID)-\(modelID)-\(serial)"
+    }
+
+    /// Whether a stored ID stands for this display. A stored ID with a serial names one exact
+    /// display; one without matches every display of that vendor and model.
+    func covers(_ display: DisplayStableID) -> Bool {
+        hasSerial ? self == display : vendorModelKey == display.vendorModelKey
+    }
+
     struct VendorModelKey: Codable, Hashable, Sendable {
         var vendorID: UInt32
         var modelID: UInt32

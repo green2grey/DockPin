@@ -3,12 +3,14 @@
 #
 # The dev copy is deliberately separate from a released DockPin:
 #   - its own bundle ID, so its settings and its Accessibility grant are its own
-#   - ad-hoc signed, without the hardened runtime
+#   - signed with an Apple Development certificate if there is one, otherwise ad-hoc; never
+#     with the hardened runtime
 #   - automatic update checks off, and a build number no release will exceed
 #
-# macOS ties an ad-hoc app's Accessibility grant to the exact build. After rebuilding, if the
-# menu bar icon shows the warning triangle even though "DockPin Dev" is ticked in
-# System Settings > Privacy & Security > Accessibility, remove it from that list (select it,
+# With an Apple Development certificate, macOS recognises each rebuild as the same app and its
+# Accessibility grant carries over. An ad-hoc build is tied to the exact binary: after
+# rebuilding, if the menu bar icon shows the warning triangle even though "DockPin Dev" is ticked
+# in System Settings > Privacy & Security > Accessibility, remove it from that list (select it,
 # press "-") and let the app ask again.
 set -euo pipefail
 
@@ -63,6 +65,7 @@ if ! otool -l "$CONTENTS/MacOS/$APP" | grep -q "@executable_path/../Frameworks";
 fi
 
 cp "$DIR/DockPin.icns" "$CONTENTS/Resources/"
+cp "$DIR/CHANGELOG.md" "$CONTENTS/Resources/"
 # ditto keeps the framework's symlinks and permissions intact.
 ditto "$BIN_PATH/Sparkle.framework" "$CONTENTS/Frameworks/Sparkle.framework"
 

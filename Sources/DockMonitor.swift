@@ -65,7 +65,7 @@ final class DockMonitor {
     private static let healthCheckInterval: TimeInterval = 0.5
 
     var allowedDisplays: Set<CGDirectDisplayID> = []
-    var overrideModifier: ModifierOption = .option
+    var overrideTrigger: OverrideTrigger = .modifier(.option)
     private(set) var isEnabled = false
 
     /// Called on the main thread after the monitor has shut its event tap down because
@@ -81,7 +81,6 @@ final class DockMonitor {
     // and every writer of the state below all run on the main thread.
     fileprivate var blockedZones: [DockTriggerZone] = []
     fileprivate var cachedDockEdge: DockEdge = .bottom
-    fileprivate var overrideFlag: CGEventFlags? = CGEventFlags.maskAlternate
     /// System uptime of the last event the override modifier let through a blocked zone.
     private var lastOverrideBypassUptime: TimeInterval?
 
@@ -90,7 +89,6 @@ final class DockMonitor {
     @discardableResult
     func startLocking() -> Bool {
         guard !isEnabled else { return true }
-        overrideFlag = overrideModifier.cgFlag
         refreshScreenCache()
         if installEventTap() {
             isEnabled = true
@@ -114,10 +112,9 @@ final class DockMonitor {
         return ProcessInfo.processInfo.systemUptime - last <= interval
     }
 
-    /// Whether the override modifier is physically held right now.
-    var isOverrideModifierDown: Bool {
-        guard let flag = overrideModifier.cgFlag else { return false }
-        return CGEventSource.flagsState(.combinedSessionState).contains(flag)
+    /// Whether the override key is physically held right now.
+    var isOverrideDown: Bool {
+        overrideTrigger.isDown
     }
 
     func refreshScreenCache() {
@@ -130,7 +127,6 @@ final class DockMonitor {
 
         guard !reachableAllowedDisplays.isEmpty else {
             blockedZones = []
-            overrideFlag = overrideModifier.cgFlag
             return
         }
 
@@ -147,7 +143,6 @@ final class DockMonitor {
                     )
                 }
             }
-        overrideFlag = overrideModifier.cgFlag
     }
 
     private func zone(
@@ -291,21 +286,20 @@ final class DockMonitor {
 
         guard isEnabled else { return Unmanaged.passUnretained(event) }
 
-        if let flag = overrideFlag, event.flags.contains(flag) {
-            let loc = event.location
-            if blockedZones.contains(where: { $0.contains(loc) }) {
-                lastOverrideBypassUptime = ProcessInfo.processInfo.systemUptime
-            }
-            return Unmanaged.passUnretained(event)
-        }
-
+        // Nearly every event is nowhere near a blocked edge; those go straight through. Only
+        // inside a zone is it worth asking whether the override is held, which for a custom key
+        // means a look at the keyboard state.
         let loc = event.location
-
-        for zone in blockedZones where zone.contains(loc) {
-            event.location = zone.nudgedPoint(from: loc)
+        guard let zone = blockedZones.first(where: { $0.contains(loc) }) else {
             return Unmanaged.passUnretained(event)
         }
 
+        if overrideTrigger.isActive(for: event) {
+            lastOverrideBypassUptime = ProcessInfo.processInfo.systemUptime
+            return Unmanaged.passUnretained(event)
+        }
+
+        event.location = zone.nudgedPoint(from: loc)
         return Unmanaged.passUnretained(event)
     }
 

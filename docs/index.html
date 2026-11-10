@@ -415,6 +415,9 @@
     z-index: 21;
   }
   .demo-has-sub:hover > .demo-submenu { display: block; }
+  /* The settings panel is taller than the menu row it hangs off; line it up with the menu's top. */
+  .demo-submenu--settings { top: -120px; }
+  .whats-new li a { color: var(--highlight); }
 
   /* Toast */
   .demo-toast {
@@ -487,6 +490,33 @@
     font-size: 13px;
     color: #777;
     line-height: 1.5;
+  }
+
+  /* ── Screenshots ── */
+  .shots-section {
+    padding: 72px 24px 8px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  .shots-grid {
+    display: grid;
+    grid-template-columns: 5fr 2fr;
+    gap: 40px;
+    align-items: center;
+  }
+  .shot { margin: 0; }
+  .shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .shot figcaption {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.3px;
+    text-align: center;
+    margin-top: 10px;
   }
 
   /* ── Features ── */
@@ -658,7 +688,7 @@
     from { opacity: 0; transform: translateY(14px); }
     to   { opacity: 1; transform: translateY(0); }
   }
-  .hero, .hero-anim-band, .demo-section, .how-it-works, .features-section, .whats-new {
+  .hero, .hero-anim-band, .demo-section, .how-it-works, .shots-section, .features-section, .whats-new {
     opacity: 0;
     animation: fadeIn 0.5s ease forwards;
   }
@@ -692,6 +722,9 @@
     .step { border-left: none; border-top: 1px solid #2a2a2a; padding: 24px 0; }
     .step:first-child { border-top: none; }
     .step-num { font-size: 36px; }
+    .shots-section { padding: 52px 16px 0; }
+    .shots-grid { grid-template-columns: 1fr; gap: 28px; }
+    .shot--narrow { max-width: 260px; margin: 0 auto; }
     .features-section { padding: 52px 16px; }
     .features-grid { grid-template-columns: 1fr; }
     .whats-new { padding: 52px 16px; }
@@ -721,7 +754,7 @@
   <p class="tagline">Keep your Dock exactly where you want it &mdash; even when your displays change.</p>
   <div>
     <a id="download" class="download-btn" href="https://github.com/green2grey/DockPin/releases/latest">Download for Mac</a>
-    <span id="version" class="download-meta">v2.0 // macOS 13+ // 5 MB</span>
+    <span id="version" class="download-meta">macOS 13+ // Apple silicon</span>
   </div>
 </section>
 
@@ -809,50 +842,20 @@
       <span id="demo-status-text">PROFILE: Home Office &ensp;// &ensp;DISPLAYS: Built-in Retina, LG 27UK850 &ensp;// &ensp;MODIFIER: Option &#8997;</span>
     </div>
 
-    <!-- Dropdown -->
+    <!-- Dropdown: the menu as it is in the app. In the app, "DockPin Settings" opens a window;
+         here it opens a panel with the same choices. -->
     <div class="demo-menu open" id="demo-main">
-      <div class="demo-header" id="demo-profile-name">Home Office</div>
+      <div class="demo-header" id="demo-status-line">Pinned to 2 displays</div>
       <div class="demo-sep"></div>
       <div class="demo-item" id="demo-toggle-item">
-        <span class="demo-item-left">DockPin Enabled</span>
+        <span class="demo-item-left">Pin the Dock</span>
         <span class="demo-toggle on" id="demo-enable"></span>
       </div>
-      <div class="demo-sep"></div>
-      <div class="demo-item demo-has-sub" id="menu-displays">
-        <span class="demo-item-left">Allow Dock on Display</span>
-        <span class="demo-arrow">&lsaquo;</span>
-        <div class="demo-submenu" id="sub-displays">
-          <div class="demo-item display-item" data-display="dell">
-            <span class="demo-item-left"><span class="demo-check"></span> DELL U2723QE</span>
-          </div>
-          <div class="demo-item display-item" data-display="builtin">
-            <span class="demo-item-left"><span class="demo-check">&check;</span> Built-in Retina</span>
-          </div>
-          <div class="demo-item display-item" data-display="lg">
-            <span class="demo-item-left"><span class="demo-check">&check;</span> LG 27UK850</span>
-          </div>
-        </div>
-      </div>
-      <div class="demo-item demo-has-sub" id="menu-modifier">
-        <span class="demo-item-left">Override Modifier</span>
-        <span class="demo-arrow">&lsaquo;</span>
-        <div class="demo-submenu" id="sub-modifier">
-          <div class="demo-item modifier-item" data-mod="option">
-            <span class="demo-item-left"><span class="demo-check">&check;</span> Option &#8997;</span>
-          </div>
-          <div class="demo-item modifier-item" data-mod="control">
-            <span class="demo-item-left"><span class="demo-check"></span> Control &#8963;</span>
-          </div>
-          <div class="demo-item modifier-item" data-mod="shift">
-            <span class="demo-item-left"><span class="demo-check"></span> Shift &#8679;</span>
-          </div>
-          <div class="demo-item modifier-item" data-mod="command">
-            <span class="demo-item-left"><span class="demo-check"></span> Command &#8984;</span>
-          </div>
-        </div>
+      <div class="demo-item" id="demo-reanchor">
+        <span class="demo-item-left">Re-anchor Dock Now</span>
       </div>
       <div class="demo-item demo-has-sub" id="menu-profiles">
-        <span class="demo-item-left">Profiles</span>
+        <span class="demo-item-left">Profile</span>
         <span class="demo-arrow">&lsaquo;</span>
         <div class="demo-submenu" id="sub-profiles">
           <div class="demo-item profile-item" data-profile="home">
@@ -864,24 +867,39 @@
           <div class="demo-item profile-item" data-profile="laptop">
             <span class="demo-item-left"><span class="demo-check"></span> Laptop Only</span>
           </div>
-          <div class="demo-sep"></div>
-          <div class="demo-item" id="demo-autoprofile">
-            <span class="demo-item-left"><span class="demo-check">&check;</span> Auto-Switch</span>
-          </div>
-          <div class="demo-sep"></div>
-          <div class="demo-item" id="demo-saveprofile">
-            <span class="demo-item-left">Save Current Profile</span>
-          </div>
         </div>
       </div>
       <div class="demo-sep"></div>
-      <div class="demo-item" id="demo-login">
-        <span class="demo-item-left"><span class="demo-check">&check;</span> Launch at Login</span>
+      <div class="demo-item demo-has-sub" id="menu-settings">
+        <span class="demo-item-left">DockPin Settings&hellip;</span>
+        <span class="demo-arrow">&lsaquo;</span>
+        <div class="demo-submenu demo-submenu--settings" id="sub-settings">
+          <div class="demo-header">Allow the Dock on</div>
+          <div class="demo-item display-item" data-display="dell">
+            <span class="demo-item-left"><span class="demo-check"></span> DELL U2723QE</span>
+          </div>
+          <div class="demo-item display-item" data-display="builtin">
+            <span class="demo-item-left"><span class="demo-check">&check;</span> Built-in Retina</span>
+          </div>
+          <div class="demo-item display-item" data-display="lg">
+            <span class="demo-item-left"><span class="demo-check">&check;</span> LG 27UK850</span>
+          </div>
+          <div class="demo-sep"></div>
+          <div class="demo-header">Override key</div>
+          <div class="demo-item modifier-item" data-mod="option">
+            <span class="demo-item-left"><span class="demo-check">&check;</span> Option &#8997;</span>
+          </div>
+          <div class="demo-item modifier-item" data-mod="control">
+            <span class="demo-item-left"><span class="demo-check"></span> Control &#8963;</span>
+          </div>
+          <div class="demo-item modifier-item" data-mod="command">
+            <span class="demo-item-left"><span class="demo-check"></span> Command &#8984;</span>
+          </div>
+          <div class="demo-item modifier-item" data-mod="custom">
+            <span class="demo-item-left"><span class="demo-check"></span> Custom: F13</span>
+          </div>
+        </div>
       </div>
-      <div class="demo-item" id="demo-updates">
-        <span class="demo-item-left"><span class="demo-check">&check;</span> Check for Updates</span>
-      </div>
-      <div class="demo-sep"></div>
       <div class="demo-item" id="demo-quit">
         <span class="demo-item-left">Quit DockPin</span>
       </div>
@@ -889,7 +907,7 @@
 
     <div class="demo-toast" id="demo-toast"></div>
   </div>
-  <p class="demo-hint">Click the menu items to configure &mdash; DockPin now warns when the current Dock edge is blocked</p>
+  <p class="demo-hint">Click the menu to try it &mdash; in the app, Settings opens a window with the same choices</p>
 </section>
 
 <section class="how-it-works">
@@ -915,28 +933,52 @@
   </div>
 </section>
 
+<section class="shots-section">
+  <div class="section-label">The real thing</div>
+  <div class="shots-grid">
+    <figure class="shot">
+      <img src="screenshots/settings-displays.png" alt="DockPin settings, showing which displays the Dock is allowed on" loading="lazy">
+      <figcaption>Choose which displays the Dock may live on</figcaption>
+    </figure>
+    <figure class="shot shot--narrow">
+      <img src="screenshots/menu.png" alt="The DockPin menu in the menu bar" loading="lazy">
+      <figcaption>A short menu for everyday use</figcaption>
+    </figure>
+  </div>
+</section>
+
 <section class="features-section">
   <div class="section-label">Features</div>
   <div class="features-grid">
     <div class="feature">
       <div class="feature-num">01</div>
-      <div class="feature-title">Pin to exposed edges</div>
-      <div class="feature-desc">Choose which monitors can host the Dock on the current macOS Dock edge, and DockPin warns when a stacked layout blocks it.</div>
+      <div class="feature-title">Pin to the displays you pick</div>
+      <div class="feature-desc">Choose which monitors can host the Dock, on the left, bottom or right. DockPin tells you when a stacked layout leaves a display with no usable edge.</div>
     </div>
     <div class="feature">
       <div class="feature-num">02</div>
       <div class="feature-title">Display profiles</div>
-      <div class="feature-desc">Save different configurations for home, office, or any monitor arrangement.</div>
+      <div class="feature-desc">Save different setups for home, office, or any monitor arrangement. Rename, delete and relink them in Settings.</div>
     </div>
     <div class="feature">
       <div class="feature-num">03</div>
       <div class="feature-title">Auto-switch</div>
-      <div class="feature-desc">Plug in a different monitor and DockPin applies the right profile automatically.</div>
+      <div class="feature-desc">Each profile remembers its monitors. Plug them in and DockPin switches to it.</div>
     </div>
     <div class="feature">
       <div class="feature-num">04</div>
       <div class="feature-title">Override anytime</div>
-      <div class="feature-desc">Hold Option to temporarily free the Dock. Configurable per profile.</div>
+      <div class="feature-desc">Hold Option to free the Dock for a moment, or record any key you like as the override.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-num">05</div>
+      <div class="feature-title">Comes back by itself</div>
+      <div class="feature-desc">If macOS moves the Dock after a wake, unlock or display change, DockPin puts it back.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-num">06</div>
+      <div class="feature-title">Out of the way</div>
+      <div class="feature-desc">A short menu, a proper Settings window, and a menu bar icon you can hide.</div>
     </div>
   </div>
 </section>
@@ -945,19 +987,21 @@
   <div class="whats-new-inner">
     <div>
       <div class="whats-new-heading">What's<br>new</div>
-      <span class="whats-new-version">V2.0</span>
+      <span class="whats-new-version">V2.2</span>
     </div>
     <ul>
-      <li>Display profiles with per-setup configurations</li>
-      <li>Automatic profile switching when displays change</li>
-      <li>Guided setup for first-time use</li>
-      <li>Automatic updates</li>
+      <li>A Settings window, and a shorter menu</li>
+      <li>The Dock returns after wake, unlock and display changes</li>
+      <li>Any key can be the override key</li>
+      <li>Hide the menu bar icon</li>
+      <li>Re-anchoring works again on current macOS</li>
+      <li><a href="https://github.com/green2grey/DockPin/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Everything in the changelog</a></li>
     </ul>
   </div>
 </section>
 
 <section class="requirements">
-  <p>Requires macOS 13 or later // Two or more displays // Dock on the left, bottom, or right edge // Displays have separate Spaces enabled in System Settings</p>
+  <p>Requires a Mac with Apple silicon // macOS 13 or later // Two or more displays // Displays have separate Spaces enabled in System Settings</p>
 </section>
 
 <section class="legal-section" id="legal">
@@ -965,16 +1009,16 @@
   <div class="legal-grid">
     <div class="legal-block">
       <div class="legal-block-title">Privacy Policy</div>
-      <p>DockPin does not collect, store, transmit, or share any personal data. The app runs entirely on your Mac and does not communicate with any external servers. No analytics, telemetry, or crash reporting data is collected.</p>
+      <p>DockPin does not collect, store, transmit, or share any personal data. No analytics, telemetry, or crash reporting data is collected. The only network connection the app makes is to check for updates and download them.</p>
       <p>DockPin requires macOS Accessibility permission solely to manage Dock placement across your displays. This permission is never used to monitor, record, or transmit any user activity.</p>
-      <p>Automatic update checks are handled by the <a href="https://sparkle-project.org" target="_blank" rel="noopener noreferrer">Sparkle</a> framework, which connects to GitHub to check for new releases. No personally identifiable information is sent during this process.</p>
+      <p>Update checks are handled by the <a href="https://sparkle-project.org" target="_blank" rel="noopener noreferrer">Sparkle</a> framework, which connects to GitHub to look for new releases and download them. No personally identifiable information is sent, and automatic checks can be turned off in Settings.</p>
     </div>
     <div class="legal-block">
       <div class="legal-block-title">Terms of Service</div>
       <p>DockPin is provided &ldquo;as is&rdquo; under the <a href="https://github.com/green2grey/DockPin/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>, without warranty of any kind, express or implied. Use of this software is at your own risk. The developer is not liable for any damages arising from installation or use of this app.</p>
       <p>DockPin is free and open-source software. The full source code is available at <a href="https://github.com/green2grey/DockPin" target="_blank" rel="noopener noreferrer">github.com/green2grey/DockPin</a>.</p>
       <p>These terms may be updated from time to time. Continued use of the app constitutes acceptance of any changes.</p>
-      <p class="legal-updated">Last updated: March 2026</p>
+      <p class="legal-updated">Last updated: November 2026</p>
     </div>
   </div>
 </section>
@@ -997,17 +1041,15 @@
     laptop: { name: 'Laptop Only',  displays: { dell: false, builtin: true, lg: false }, modifier: 'option' }
   };
 
-  const modLabels = { option: 'Option \u2325', control: 'Control \u2303', shift: 'Shift \u21E7', command: 'Command \u2318' };
+  const modLabels = { option: 'Option \u2325', control: 'Control \u2303', command: 'Command \u2318', custom: 'F13' };
+  const displayLabels = { dell: 'DELL U2723QE', builtin: 'Built-in Retina', lg: 'LG 27UK850' };
 
   const state = {
     enabled: true,
     profile: 'home',
     displays: { dell: false, builtin: true, lg: true },
     modifier: 'option',
-    dockOn: 'builtin',
-    loginAtStart: true,
-    checkUpdates: true,
-    autoSwitch: true
+    dockOn: 'builtin'
   };
 
   // ── DOM refs ──
@@ -1016,7 +1058,7 @@
   const toast = document.getElementById('demo-toast');
   const statusText = document.getElementById('demo-status-text');
   const statusDot = document.getElementById('demo-dot');
-  const profileName = document.getElementById('demo-profile-name');
+  const statusLine = document.getElementById('demo-status-line');
   const enableToggle = document.getElementById('demo-enable');
   let toastTimer;
 
@@ -1058,8 +1100,12 @@
     // Toggle
     enableToggle.classList.toggle('on', state.enabled);
 
-    // Profile name
-    profileName.textContent = profiles[state.profile].name;
+    // The menu's first line says what DockPin is doing, as in the app
+    const pinned = Object.keys(state.displays).filter(k => state.displays[k]);
+    statusLine.textContent = !state.enabled ? 'DockPin is off'
+      : pinned.length === 0 ? 'No display allowed'
+      : pinned.length === 1 ? 'Pinned to ' + displayLabels[pinned[0]]
+      : 'Pinned to ' + pinned.length + ' displays';
 
     // Status dot
     statusDot.classList.toggle('off', !state.enabled);
@@ -1068,12 +1114,10 @@
     if (!state.enabled) {
       statusText.innerHTML = 'DOCKPIN DISABLED &ensp;// &ensp;Dock is free to move between all displays';
     } else {
-      const allowed = Object.entries(state.displays).filter(([,v]) => v).map(([k]) => {
-        return { dell: 'DELL U2723QE', builtin: 'Built-in Retina', lg: 'LG 27UK850' }[k];
-      });
+      const allowed = Object.entries(state.displays).filter(([,v]) => v).map(([k]) => displayLabels[k]);
       statusText.innerHTML = 'PROFILE: ' + profiles[state.profile].name +
         ' &ensp;// &ensp;DISPLAYS: ' + (allowed.length ? allowed.join(', ') : 'None') +
-        ' &ensp;// &ensp;MODIFIER: ' + modLabels[state.modifier];
+        ' &ensp;// &ensp;OVERRIDE KEY: ' + modLabels[state.modifier];
     }
   }
 
@@ -1103,7 +1147,21 @@
   document.getElementById('demo-toggle-item').addEventListener('click', () => {
     state.enabled = !state.enabled;
     render();
-    showToast(state.enabled ? 'DockPin enabled' : 'DockPin disabled');
+    showToast(state.enabled ? 'Dock pinned' : 'Dock free to move');
+  });
+
+  // Re-anchor: send the Dock back to an allowed display
+  document.getElementById('demo-reanchor').addEventListener('click', () => {
+    const allowed = Object.keys(state.displays).filter(k => state.displays[k]);
+    if (!state.enabled) {
+      showToast('Turn on Pin the Dock first');
+    } else if (allowed.length !== 1) {
+      showToast('Works when exactly one display is allowed');
+    } else {
+      state.dockOn = allowed[0];
+      render();
+      showToast('Dock sent back to ' + displayLabels[allowed[0]]);
+    }
   });
 
   // Display toggles
@@ -1113,8 +1171,7 @@
       state.displays[key] = !state.displays[key];
       moveDock();
       render();
-      const label = { dell: 'DELL U2723QE', builtin: 'Built-in Retina', lg: 'LG 27UK850' }[key];
-      showToast(state.displays[key] ? label + ' allowed' : label + ' blocked');
+      showToast(displayLabels[key] + (state.displays[key] ? ' allowed' : ' blocked'));
     });
 
     // Highlight display on hover
@@ -1132,7 +1189,7 @@
     item.addEventListener('click', () => {
       state.modifier = item.dataset.mod;
       render();
-      showToast('Override: ' + modLabels[state.modifier]);
+      showToast(state.modifier === 'custom' ? 'In the app, press any key to record it' : 'Override key: ' + modLabels[state.modifier]);
     });
   });
 
@@ -1148,20 +1205,6 @@
       render();
       showToast('Switched to ' + p.name);
     });
-  });
-
-  // Checkbox toggles
-  ['demo-login', 'demo-updates', 'demo-autoprofile'].forEach(id => {
-    document.getElementById(id).addEventListener('click', () => {
-      const check = document.getElementById(id).querySelector('.demo-check');
-      const has = check.textContent.trim() === '\u2713';
-      check.innerHTML = has ? '' : '&check;';
-    });
-  });
-
-  // Save profile
-  document.getElementById('demo-saveprofile').addEventListener('click', () => {
-    showToast('Profile saved');
   });
 
   // Quit
@@ -1197,9 +1240,9 @@ fetch('https://api.github.com/repos/green2grey/DockPin/releases/latest')
     if (data.assets && data.assets.length > 0) {
       btn.href = data.assets[0].browser_download_url;
       const mb = (data.assets[0].size / 1048576).toFixed(1);
-      ver.innerHTML = data.tag_name + ' // macOS 13+ // ' + mb + ' MB';
+      ver.innerHTML = data.tag_name + ' // macOS 13+ // Apple silicon // ' + mb + ' MB';
     } else if (data.tag_name) {
-      ver.innerHTML = data.tag_name + ' // macOS 13+';
+      ver.innerHTML = data.tag_name + ' // macOS 13+ // Apple silicon';
     }
   })
   .catch(() => {});

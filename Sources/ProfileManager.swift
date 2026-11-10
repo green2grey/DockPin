@@ -25,6 +25,9 @@ final class ProfileManager {
         static let autoSwitchEnabled = "v2.autoSwitchEnabled"
         static let manualHoldEnabled = "v2.manualHoldEnabled"
         static let resetNoticeShown = "v2.resetNoticeShown"
+        static let hidesMenuBarIcon = "v2.hidesMenuBarIcon"
+        static let lastRunVersion = "v2.lastRunVersion"
+        static let displayNames = "v2.displayNames"
     }
 
     private let encoder: JSONEncoder = {
@@ -60,6 +63,35 @@ final class ProfileManager {
         set { defaults.set(newValue, forKey: Key.resetNoticeShown) }
     }
 
+    /// The version of DockPin that last ran here, used to notice an update. Versions before 2.2
+    /// never recorded it.
+    var lastRunVersion: String? {
+        get { defaults.string(forKey: Key.lastRunVersion) }
+        set { defaults.set(newValue, forKey: Key.lastRunVersion) }
+    }
+
+    var hidesMenuBarIcon: Bool {
+        get { defaults.bool(forKey: Key.hidesMenuBarIcon) }
+        set { defaults.set(newValue, forKey: Key.hidesMenuBarIcon) }
+    }
+
+    /// Names of displays seen so far, keyed by `DisplayStableID.storageKey`, so a display a
+    /// profile refers to can still be named while it's unplugged.
+    private(set) var displayNames: [String: String] {
+        get { defaults.dictionary(forKey: Key.displayNames) as? [String: String] ?? [:] }
+        set { defaults.set(newValue, forKey: Key.displayNames) }
+    }
+
+    func rememberDisplayNames(from snapshot: DisplaySnapshot) {
+        var names = displayNames
+        var changed = false
+        for display in snapshot.displays where names[display.stableID.storageKey] != display.localizedName {
+            names[display.stableID.storageKey] = display.localizedName
+            changed = true
+        }
+        if changed { displayNames = names }
+    }
+
     var activeProfileID: UUID? {
         get {
             guard let raw = defaults.string(forKey: Key.activeProfileID) else { return nil }
@@ -84,6 +116,10 @@ final class ProfileManager {
         load()
     }
 
+    /// Whether the last `load()` found stored profiles it could not read at all. While this is
+    /// true the stored data is still in place, so nothing should replace it without the user
+    /// asking.
+    private(set) var storedProfilesUnreadable = false
     /// The problem found by the last `load()`, until the user has been told about it once.
     private(set) var unacknowledgedLoadIssue: LoadIssue?
     private var loadIssueFingerprint: String?
@@ -91,6 +127,7 @@ final class ProfileManager {
     func load() {
         unacknowledgedLoadIssue = nil
         loadIssueFingerprint = nil
+        storedProfilesUnreadable = false
 
         guard let data = defaults.data(forKey: Key.profiles) else {
             profiles = []
@@ -108,6 +145,7 @@ final class ProfileManager {
         } catch {
             profiles = []
             issue = .unreadable
+            storedProfilesUnreadable = true
             logger.error("Stored profiles are unreadable: \(String(describing: error), privacy: .public)")
         }
 
@@ -148,6 +186,7 @@ final class ProfileManager {
 
     func addProfile(_ profile: DockProfile, makeActive: Bool = true) {
         profiles.append(profile)
+        storedProfilesUnreadable = false
         persistProfiles()
         if makeActive {
             activeProfileID = profile.id
@@ -187,6 +226,21 @@ final class ProfileManager {
         }
     }
 
+    func renameProfile(id: UUID, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        updateProfile(id: id) { $0.name = trimmed }
+    }
+
+    /// A name no existing profile has, built from `base` ("Profile", "Profile 2", ...).
+    func unusedProfileName(base: String = "Profile") -> String {
+        let taken = Set(profiles.map { $0.name.lowercased() })
+        if !taken.contains(base.lowercased()) { return base }
+        var number = 2
+        while taken.contains("\(base) \(number)".lowercased()) { number += 1 }
+        return "\(base) \(number)"
+    }
+
     func saveCurrentAsProfile(name: String, snapshot: DisplaySnapshot) -> DockProfile? {
         guard var base = activeProfile else { return nil }
         base.id = UUID()
@@ -215,6 +269,14 @@ final class ProfileManager {
             requirements[display.stableID, default: 0] += 1
         }
         return requirements.isEmpty ? nil : requirements
+    }
+
+    /// Makes the displays connected right now the profile's auto-switch trigger, replacing
+    /// whatever it had. With no external display connected the profile ends up with no trigger.
+    func relinkTrigger(id: UUID, snapshot: DisplaySnapshot) {
+        updateProfile(id: id) {
+            $0.triggerRequirements = Self.triggerRequirements(for: snapshot, mirroringPolicy: $0.mirroringPolicy)
+        }
     }
 
     /// Gives a profile that has no trigger yet (anything made before v2.2) the current display
