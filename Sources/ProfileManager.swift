@@ -1,13 +1,25 @@
 import Foundation
 import CoreGraphics
+import CryptoKit
 import OSLog
 
 final class ProfileManager {
+    /// Something went wrong reading the stored profiles. The stored data is never overwritten
+    /// because of it; a copy is kept under a backup key.
+    enum LoadIssue: Equatable {
+        /// Some profiles were unreadable and left out.
+        case skippedProfiles(Int)
+        /// Nothing could be read.
+        case unreadable
+    }
+
     private let defaults: UserDefaults
     private let logger = Logger(subsystem: "com.green2grey.DockPin", category: "profiles")
 
     private enum Key {
         static let profiles = "v2.profiles"
+        static let profilesBackup = "v2.profilesUnreadableBackup"
+        static let loadIssueAcknowledged = "v2.profilesLoadIssueAcknowledged"
         static let activeProfileID = "v2.activeProfileID"
         static let setupCompleted = "v2.setupCompleted"
         static let autoSwitchEnabled = "v2.autoSwitchEnabled"
@@ -72,23 +84,66 @@ final class ProfileManager {
         load()
     }
 
+    /// The problem found by the last `load()`, until the user has been told about it once.
+    private(set) var unacknowledgedLoadIssue: LoadIssue?
+    private var loadIssueFingerprint: String?
+
     func load() {
-        if let data = defaults.data(forKey: Key.profiles),
-           let decoded = try? decoder.decode([DockProfile].self, from: data)
-        {
-            profiles = decoded
-        } else {
+        unacknowledgedLoadIssue = nil
+        loadIssueFingerprint = nil
+
+        guard let data = defaults.data(forKey: Key.profiles) else {
             profiles = []
+            return
+        }
+
+        var issue: LoadIssue?
+        do {
+            let stored = try decoder.decode(StoredProfiles.self, from: data)
+            profiles = stored.profiles
+            if stored.skippedCount > 0 {
+                issue = .skippedProfiles(stored.skippedCount)
+                logger.error("Skipped \(stored.skippedCount) unreadable stored profile(s)")
+            }
+        } catch {
+            profiles = []
+            issue = .unreadable
+            logger.error("Stored profiles are unreadable: \(String(describing: error), privacy: .public)")
         }
 
         for idx in profiles.indices {
             profiles[idx].sanitize()
         }
-        persistProfiles()
 
+        if let issue {
+            // Keep what was stored. It stays under the main key until the user next changes a
+            // profile, and under the backup key after that.
+            defaults.set(data, forKey: Key.profilesBackup)
+            let fingerprint = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            if defaults.string(forKey: Key.loadIssueAcknowledged) != fingerprint {
+                unacknowledgedLoadIssue = issue
+                loadIssueFingerprint = fingerprint
+            }
+            return
+        }
+
+        // A clean read: store the sanitized form if it differs, and drop a dangling selection.
+        if let encoded = try? encoder.encode(profiles), encoded != data {
+            defaults.set(encoded, forKey: Key.profiles)
+        }
         if let id = activeProfileID, !profiles.contains(where: { $0.id == id }) {
             activeProfileID = nil
         }
+    }
+
+    /// Records that the user has seen the current load issue, so it isn't reported again for the
+    /// same stored data.
+    func acknowledgeLoadIssue() {
+        if let loadIssueFingerprint {
+            defaults.set(loadIssueFingerprint, forKey: Key.loadIssueAcknowledged)
+        }
+        unacknowledgedLoadIssue = nil
+        loadIssueFingerprint = nil
     }
 
     func addProfile(_ profile: DockProfile, makeActive: Bool = true) {
@@ -132,15 +187,45 @@ final class ProfileManager {
         }
     }
 
-    func saveCurrentAsProfile(name: String) -> DockProfile? {
+    func saveCurrentAsProfile(name: String, snapshot: DisplaySnapshot) -> DockProfile? {
         guard var base = activeProfile else { return nil }
         base.id = UUID()
         base.name = name
-        base.triggerRequirements = nil
+        base.triggerRequirements = Self.triggerRequirements(for: snapshot, mirroringPolicy: base.mirroringPolicy)
         base.sanitize()
         addProfile(base, makeActive: true)
         manualHoldEnabled = true
         return base
+    }
+
+    // MARK: - Auto-switch
+
+    /// The display setup a profile created right now should auto-activate for: every external
+    /// display currently connected.
+    ///
+    /// The built-in display is left out on purpose. It says nothing about where a laptop is, and
+    /// requiring it would stop a profile made with the lid open from matching in clamshell mode.
+    /// With no external display there is nothing to tell setups apart, so there is no trigger.
+    static func triggerRequirements(
+        for snapshot: DisplaySnapshot,
+        mirroringPolicy: MirroringPolicy
+    ) -> [DisplayStableID: Int]? {
+        var requirements: [DisplayStableID: Int] = [:]
+        for display in snapshot.filtered(for: mirroringPolicy) where !display.isBuiltIn {
+            requirements[display.stableID, default: 0] += 1
+        }
+        return requirements.isEmpty ? nil : requirements
+    }
+
+    /// Gives a profile that has no trigger yet (anything made before v2.2) the current display
+    /// setup as its trigger. Called when the user picks the profile by hand, which is the one
+    /// moment DockPin knows the profile belongs with these displays.
+    func learnTriggerIfMissing(id: UUID, snapshot: DisplaySnapshot) {
+        guard let profile = profiles.first(where: { $0.id == id }),
+              profile.triggerRequirements == nil,
+              let requirements = Self.triggerRequirements(for: snapshot, mirroringPolicy: profile.mirroringPolicy)
+        else { return }
+        updateProfile(id: id) { $0.triggerRequirements = requirements }
     }
 
     func resolveAllowedDisplayIDs(for profile: DockProfile, snapshot: DisplaySnapshot) -> Set<CGDirectDisplayID> {
@@ -191,8 +276,34 @@ final class ProfileManager {
     }
 
     private func persistProfiles() {
-        if let data = try? encoder.encode(profiles) {
-            defaults.set(data, forKey: Key.profiles)
+        do {
+            defaults.set(try encoder.encode(profiles), forKey: Key.profiles)
+        } catch {
+            logger.error("Couldn't save profiles: \(String(describing: error), privacy: .public)")
         }
+    }
+}
+
+/// The stored profile list, read one profile at a time so a single bad entry doesn't take the
+/// rest with it.
+private struct StoredProfiles: Decodable {
+    var profiles: [DockProfile] = []
+    var skippedCount = 0
+
+    init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        while !container.isAtEnd {
+            do {
+                profiles.append(try container.decode(DockProfile.self))
+            } catch {
+                skippedCount += 1
+                // A failed decode leaves the container on the same element; consume it.
+                _ = try container.decode(AnyValue.self)
+            }
+        }
+    }
+
+    private struct AnyValue: Decodable {
+        init(from decoder: Decoder) throws {}
     }
 }

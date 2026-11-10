@@ -28,6 +28,29 @@ struct DockProfile: Codable, Identifiable, Sendable, Equatable {
         sanitize()
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case id, name, isEnabled, overrideModifier, allowedDisplays, triggerRequirements, mirroringPolicy
+    }
+
+    /// A profile is only unreadable when its identity or its display list is. Every other field
+    /// falls back to a default, so a value written by a newer or older build (say, a modifier this
+    /// build doesn't know) can't cost the user the whole profile.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        allowedDisplays = try container.decode(Set<DisplayStableID>.self, forKey: .allowedDisplays)
+        isEnabled = (try? container.decode(Bool.self, forKey: .isEnabled)) ?? false
+        overrideModifier = (try? container.decode(ModifierOption.self, forKey: .overrideModifier)) ?? .option
+        triggerRequirements = try? container.decodeIfPresent(
+            [DisplayStableID: Int].self,
+            forKey: .triggerRequirements
+        )
+        mirroringPolicy = (try? container.decode(MirroringPolicy.self, forKey: .mirroringPolicy))
+            ?? .ignoreMirroredSecondaries
+        sanitize()
+    }
+
     mutating func sanitize() {
         if var reqs = triggerRequirements {
             reqs = reqs.filter { $0.value > 0 }

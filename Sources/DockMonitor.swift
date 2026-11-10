@@ -62,19 +62,28 @@ struct DockTriggerZone {
 // MARK: - DockMonitor
 
 final class DockMonitor {
-    private static let dockEdgePollInterval: TimeInterval = 0.5
+    private static let healthCheckInterval: TimeInterval = 0.5
 
     var allowedDisplays: Set<CGDirectDisplayID> = []
     var overrideModifier: ModifierOption = .option
     private(set) var isEnabled = false
 
+    /// Called on the main thread after the monitor has shut its event tap down because
+    /// Accessibility access went away.
+    var onAccessibilityLost: (() -> Void)?
+    /// Replaceable in tests.
+    var isProcessTrusted: () -> Bool = { AXIsProcessTrusted() }
+
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var dockEdgePollTimer: Timer?
-    /// Written on main thread, read in event tap callback.
+    private var healthCheckTimer: Timer?
+    // The tap's run-loop source is added to the main run loop, so the callback, the health timer
+    // and every writer of the state below all run on the main thread.
     fileprivate var blockedZones: [DockTriggerZone] = []
     fileprivate var cachedDockEdge: DockEdge = .bottom
     fileprivate var overrideFlag: CGEventFlags? = CGEventFlags.maskAlternate
+    /// System uptime of the last event the override modifier let through a blocked zone.
+    private var lastOverrideBypassUptime: TimeInterval?
 
     // MARK: - Public
 
@@ -85,7 +94,7 @@ final class DockMonitor {
         refreshScreenCache()
         if installEventTap() {
             isEnabled = true
-            startDockEdgePolling()
+            startHealthChecks()
             return true
         }
         return false
@@ -94,8 +103,21 @@ final class DockMonitor {
     func stopLocking() {
         guard isEnabled else { return }
         isEnabled = false
-        stopDockEdgePolling()
+        stopHealthChecks()
         removeEventTap()
+    }
+
+    /// Whether the user recently used the override modifier to push through a blocked Dock edge,
+    /// which means a Dock move right now is theirs and not macOS acting on its own.
+    func overrideBypassed(within interval: TimeInterval) -> Bool {
+        guard let last = lastOverrideBypassUptime else { return false }
+        return ProcessInfo.processInfo.systemUptime - last <= interval
+    }
+
+    /// Whether the override modifier is physically held right now.
+    var isOverrideModifierDown: Bool {
+        guard let flag = overrideModifier.cgFlag else { return false }
+        return CGEventSource.flagsState(.combinedSessionState).contains(flag)
     }
 
     func refreshScreenCache() {
@@ -201,39 +223,79 @@ final class DockMonitor {
     }
 
     private func removeEventTap() {
-        if let tap = eventTap { CGEvent.tapEnable(tap: tap, enable: false) }
+        if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+        }
         if let src = runLoopSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), src, .commonModes) }
         eventTap = nil
         runLoopSource = nil
     }
 
-    private func startDockEdgePolling() {
-        guard dockEdgePollTimer == nil else { return }
+    // MARK: - Health checks
 
-        let timer = Timer(timeInterval: Self.dockEdgePollInterval, repeats: true) { [weak self] _ in
-            guard let self, self.isEnabled else { return }
-            guard DockEdge.current() != self.cachedDockEdge else { return }
-            self.refreshScreenCache()
+    private func startHealthChecks() {
+        guard healthCheckTimer == nil else { return }
+
+        let timer = Timer(timeInterval: Self.healthCheckInterval, repeats: true) { [weak self] _ in
+            self?.runHealthCheck()
         }
-        dockEdgePollTimer = timer
+        healthCheckTimer = timer
         RunLoop.main.add(timer, forMode: .common)
     }
 
-    private func stopDockEdgePolling() {
-        dockEdgePollTimer?.invalidate()
-        dockEdgePollTimer = nil
+    private func stopHealthChecks() {
+        healthCheckTimer?.invalidate()
+        healthCheckTimer = nil
     }
 
+    private func runHealthCheck() {
+        guard isEnabled else { return }
+
+        // An active tap held by a process that has lost Accessibility access can stall mouse
+        // input for the whole session, so this is checked before anything else.
+        guard isProcessTrusted() else {
+            handleAccessibilityLost()
+            return
+        }
+
+        // macOS can switch a tap off (after a timeout, across sleep) without the callback
+        // hearing about it; without this DockPin would silently stop blocking.
+        if let tap = eventTap, !CGEvent.tapIsEnabled(tap: tap) {
+            CGEvent.tapEnable(tap: tap, enable: true)
+        }
+
+        if DockEdge.current() != cachedDockEdge {
+            refreshScreenCache()
+        }
+    }
+
+    private func handleAccessibilityLost() {
+        guard isEnabled else { return }
+        stopLocking()
+        onAccessibilityLost?()
+    }
+
+    // MARK: - Event handling
+
     fileprivate func processEvent(_ event: CGEvent, type: CGEventType) -> Unmanaged<CGEvent>? {
-        // Re-enable if macOS auto-disabled the tap
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            if let tap = eventTap { CGEvent.tapEnable(tap: tap, enable: true) }
+            // macOS auto-disabled the tap; turn it back on, but never re-arm a filter we're no
+            // longer allowed to run. In that case the tap stays off and the next health check
+            // (at most half a second away) tears it down, outside its own callback.
+            if isProcessTrusted(), let tap = eventTap {
+                CGEvent.tapEnable(tap: tap, enable: true)
+            }
             return Unmanaged.passUnretained(event)
         }
 
         guard isEnabled else { return Unmanaged.passUnretained(event) }
 
         if let flag = overrideFlag, event.flags.contains(flag) {
+            let loc = event.location
+            if blockedZones.contains(where: { $0.contains(loc) }) {
+                lastOverrideBypassUptime = ProcessInfo.processInfo.systemUptime
+            }
             return Unmanaged.passUnretained(event)
         }
 

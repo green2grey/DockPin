@@ -5,7 +5,7 @@ enum DockEdge: String, CaseIterable, Codable, Sendable {
     case bottom
     case right
 
-    private static let dockDefaults = UserDefaults(suiteName: "com.apple.dock")
+    fileprivate static let dockDefaults = UserDefaults(suiteName: "com.apple.dock")
 
     static func current() -> DockEdge {
         guard
@@ -34,5 +34,12 @@ enum DockEdge: String, CaseIterable, Codable, Sendable {
 
     var requirementDescription: String {
         "\(rawValue) edge"
+    }
+}
+
+/// Other Dock settings DockPin reads (never writes).
+enum DockPreferences {
+    static var isAutoHideEnabled: Bool {
+        DockEdge.dockDefaults?.bool(forKey: "autohide") ?? false
     }
 }

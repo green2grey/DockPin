@@ -11,10 +11,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var autoSwitchTask: Task<Void, Never>?
     private var screenChangeTick = 0
     private var recoveryTask: Task<Void, Never>?
-    private var sessionLocked = false
-    private var sessionInactive = false
+    private var environmentTimer: Timer?
+    private var lastEnvironment: EnvironmentState?
+    private var lockStatus: LockStatus = .notConfigured
+    // Set from notifications only; `sessionAllowsReanchor` cross-checks them against the session
+    // itself so one missed notification can't switch re-anchoring off for good.
     private var systemAsleep = false
-    private var sessionUnavailable: Bool { sessionLocked || sessionInactive || systemAsleep }
+    private var screenLocked = false
 
     let monitor = DockMonitor()
     private let dockReanchorer = DockReanchorer()
@@ -52,20 +55,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                      NSWorkspace.sessionDidResignActiveNotification] {
             workspaceNotifications.addObserver(self, selector: #selector(suspendSession), name: name, object: nil)
         }
+        // Distributed notifications are held back while an app is inactive unless it asks
+        // otherwise, and a menu bar app is inactive nearly all the time.
         let distributedNotifications = DistributedNotificationCenter.default()
         distributedNotifications.addObserver(self, selector: #selector(resumeSession),
-                                             name: NSNotification.Name("com.apple.screenIsUnlocked"), object: nil)
+                                             name: Self.screenUnlockedNotification, object: nil,
+                                             suspensionBehavior: .deliverImmediately)
         distributedNotifications.addObserver(self, selector: #selector(suspendSession),
-                                             name: NSNotification.Name("com.apple.screenIsLocked"), object: nil)
+                                             name: Self.screenLockedNotification, object: nil,
+                                             suspensionBehavior: .deliverImmediately)
+
+        monitor.onAccessibilityLost = { [weak self] in
+            MainActor.assumeIsolated {
+                self?.applyCurrentState(snapshot: .current())
+            }
+        }
+
+        #if DOCKPIN_DEV
+        // Dev builds only (see build-dev.sh): lets a script ask for a re-anchor, so gesture
+        // timings can be tried against the real Dock without clicking through the menu.
+        distributedNotifications.addObserver(self, selector: #selector(devReanchorRequested),
+                                             name: Notification.Name("com.green2grey.DockPin.dev.reanchor"),
+                                             object: nil, suspensionBehavior: .deliverImmediately)
+        #endif
 
         promptAccessibilityIfNeeded()
         handleV1ResetNoticeIfNeeded()
+        reportProfileLoadIssueIfNeeded()
 
         applyCurrentState(snapshot: .current())
         scheduleRecovery()
 
         updateIcon()
     }
+
+    #if DOCKPIN_DEV
+    @objc private func devReanchorRequested() {
+        startReanchor(mode: .manual)
+    }
+    #endif
 
     // MARK: - Status Bar
 
@@ -78,29 +106,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateIcon() {
         guard let button = statusItem.button else { return }
 
-        let configured = isConfigured
-        let active = profileManager.activeProfile
+        let profileName = profileManager.activeProfile?.name ?? "Profile"
 
         let symbol: String
         let fallback: String
         let tooltip: String
 
-        if !configured {
+        // The icon shows what DockPin is doing, not just what the profile asks for: a filled pin
+        // only while the Dock is actually being held in place.
+        switch lockStatus {
+        case .notConfigured:
             symbol = "pin.slash"
             fallback = "lock.open"
             tooltip = "DockPin — Not configured"
-        } else if active?.isEnabled == true {
-            symbol = "pin.fill"
-            fallback = "lock.fill"
-            tooltip = "DockPin — \(active?.name ?? "Profile")"
-        } else {
+        case .disabled:
             symbol = "pin"
             fallback = "lock"
             tooltip = "DockPin — Disabled"
+        case .locking:
+            symbol = "pin.fill"
+            fallback = "lock.fill"
+            tooltip = "DockPin — \(profileName)"
+        case .needsAccessibility, .tapUnavailable:
+            symbol = "exclamationmark.triangle"
+            fallback = "lock.slash"
+            tooltip = "DockPin — \(lockStatus.explanation(dockEdge: DockEdge.current()) ?? "Not running")"
+        case .separateSpacesOff, .allowedDisplayMissing, .edgeBlocked:
+            symbol = "pin"
+            fallback = "lock"
+            tooltip = "DockPin — \(profileName) (\(lockStatus.explanation(dockEdge: DockEdge.current()) ?? "idle"))"
         }
 
-        let img = NSImage(systemSymbolName: symbol, accessibilityDescription: "DockPin")
-            ?? NSImage(systemSymbolName: fallback, accessibilityDescription: "DockPin")
+        let img = NSImage(systemSymbolName: symbol, accessibilityDescription: tooltip)
+            ?? NSImage(systemSymbolName: fallback, accessibilityDescription: tooltip)
         img?.isTemplate = true
         button.image = img
         button.toolTip = tooltip
@@ -136,6 +174,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let hdr = NSMenuItem(title: hdrTitle, action: nil, keyEquivalent: "")
         hdr.isEnabled = false
         menu.addItem(hdr)
+
+        // ── Why an enabled profile isn't blocking ──
+        if let explanation = lockStatus.explanation(dockEdge: dockEdge) {
+            if lockStatus == .needsAccessibility {
+                let grant = NSMenuItem(
+                    title: "\(explanation) — Open System Settings…",
+                    action: #selector(openAccessibilitySettings),
+                    keyEquivalent: ""
+                )
+                grant.target = self
+                grant.image = Self.warningIcon
+                menu.addItem(grant)
+            } else {
+                let note = NSMenuItem(title: explanation, action: nil, keyEquivalent: "")
+                note.isEnabled = false
+                if lockStatus.needsAttention { note.image = Self.warningIcon }
+                if lockStatus == .separateSpacesOff {
+                    note.toolTip = "macOS keeps the Dock on the main display while this setting is off. "
+                        + "Turn it on in System Settings → Desktop & Dock → Mission Control, then log out and back in."
+                }
+                menu.addItem(note)
+            }
+        }
 
         menu.addItem(.separator())
 
@@ -369,7 +430,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         body("Keep your Dock exactly where you want it.")
 
         heading("Getting Started")
-        numbered(1, "Grant Accessibility permission when prompted (System Settings → Privacy & Security → Accessibility). Relaunch the app after granting access.")
+        numbered(1, "Grant Accessibility permission when prompted (System Settings → Privacy & Security → Accessibility). DockPin notices within a couple of seconds; no relaunch needed. The menu bar icon shows a warning triangle while access is missing.")
         numbered(2, "Click DockPin in the menu bar.")
         numbered(3, "Choose Set Up…, name your first profile, and select the displays where the Dock is allowed.")
         numbered(4, "Optionally enable DockPin after setup, or enable it later from the menu.")
@@ -382,14 +443,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         body("Switch profiles from the Profiles submenu. Selecting a profile temporarily pauses auto-switching until you choose Resume Auto-switching.")
 
         heading("Auto-switching")
-        body("If auto-switching is enabled, DockPin can switch profiles based on display configurations. If multiple profiles match equally, DockPin won't switch automatically.")
+        body("Each profile remembers which external displays were connected when you created it. With auto-switching on, DockPin switches to the profile whose displays are all connected whenever your displays change. If several profiles fit, the one that matches more displays wins; if it’s still a tie, DockPin doesn’t switch.")
+        body("Profiles made before version 2.2 pick up their displays the first time you select them by hand.")
 
         heading("Dock Edge")
         body("DockPin follows the current macOS Dock edge setting (Left, Bottom, or Right). If another display fully covers the chosen edge, macOS won’t place the Dock there. DockPin warns when your current arrangement blocks that edge.")
 
         heading("Re-anchor Dock Now")
         body("macOS does not provide any way for apps to move the Dock to a specific display. When you select Re-anchor Dock Now, DockPin briefly moves the cursor to the chosen display’s edge and back to simulate the gesture macOS uses to relocate the Dock. This is best-effort — it may not work in every situation.")
-        body("Re-anchor is available when exactly one display is allowed and its current Dock edge is exposed. DockPin also attempts a re-anchor automatically when you enable locking, switch profiles, or displays change.")
+        body("Re-anchor is available when exactly one display is allowed and its current Dock edge is exposed. DockPin also checks on its own when it starts, when you enable locking or switch profiles, when displays change, and after your Mac wakes or unlocks. Those automatic checks only take the cursor if the Dock is actually on the wrong display, and they wait while you’re holding a mouse button.")
+        body("If you move the Dock yourself while holding the override key, DockPin leaves it there until your displays change or your Mac next wakes or unlocks.")
 
         heading("Override Modifier Key")
         body("Hold a modifier key (Option by default) to temporarily bypass locking and move the Dock freely. You can change the key per profile under Override Modifier Key.")
@@ -411,6 +474,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         img?.isTemplate = true
         return img
     }()
+
+    private static let warningIcon: NSImage? = {
+        let img = NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: "Needs attention")
+        img?.isTemplate = true
+        return img
+    }()
+
+    private static let screenLockedNotification = Notification.Name("com.apple.screenIsLocked")
+    private static let screenUnlockedNotification = Notification.Name("com.apple.screenIsUnlocked")
+    /// How long after the user pushes through a blocked edge with the override modifier a Dock
+    /// move still counts as theirs.
+    private static let overrideGracePeriod: TimeInterval = 5
 
     // MARK: - Actions
 
@@ -445,10 +520,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             profileManager.updateProfile(id: active.id) { $0.isEnabled = true }
+            if !isAccessibilityTrusted() {
+                promptAccessibilityIfNeeded()
+            }
         }
 
         applyCurrentState(snapshot: snapshot, attemptReanchor: true)
         updateIcon()
+    }
+
+    @objc private func openAccessibilitySettings() {
+        promptAccessibilityIfNeeded()
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     @objc private func toggleAllow(_ sender: NSMenuItem) {
@@ -530,8 +615,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func selectProfile(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? UUID else { return }
+        let snapshot = DisplaySnapshot.current()
         profileManager.setActiveProfile(id: id, manualHold: true)
-        applyCurrentState(snapshot: .current(), attemptReanchor: true)
+        profileManager.learnTriggerIfMissing(id: id, snapshot: snapshot)
+        applyCurrentState(snapshot: snapshot, attemptReanchor: true)
     }
 
     @objc private func toggleAutoSwitch() {
@@ -566,12 +653,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let name = nameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
 
-        _ = profileManager.saveCurrentAsProfile(name: name)
+        _ = profileManager.saveCurrentAsProfile(name: name, snapshot: .current())
         applyCurrentState(snapshot: .current())
     }
 
     @objc private func quitApp() {
         recoveryTask?.cancel()
+        environmentTimer?.invalidate()
         dockReanchorer.cancel()
         monitor.stopLocking()
         NSApp.terminate(nil)
@@ -580,14 +668,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func screensChanged() {
         applyCurrentState(snapshot: .current())
         scheduleAutoSwitch()
+
+        // A Dock move posts this notification too. If the user just pushed through a blocked
+        // edge with the override modifier, the move is theirs: don't drag the Dock back.
+        if monitor.overrideBypassed(within: Self.overrideGracePeriod) || monitor.isOverrideModifierDown {
+            recoveryTask?.cancel()
+            recoveryTask = nil
+            dockReanchorer.cancel()
+            return
+        }
         scheduleRecovery()
     }
 
     @objc private func suspendSession(_ notification: Notification) {
         switch notification.name {
-        case NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification: systemAsleep = true
-        case NSWorkspace.sessionDidResignActiveNotification: sessionInactive = true
-        default: sessionLocked = true
+        case NSWorkspace.willSleepNotification: systemAsleep = true
+        case Self.screenLockedNotification: screenLocked = true
+        default: break
         }
         recoveryTask?.cancel()
         recoveryTask = nil
@@ -595,18 +692,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func resumeSession(_ notification: Notification) {
-        switch notification.name {
-        case NSWorkspace.didWakeNotification, NSWorkspace.screensDidWakeNotification: systemAsleep = false
-        case NSWorkspace.sessionDidBecomeActiveNotification: sessionInactive = false
-        default: sessionLocked = false
+        // Screens waking, the session coming back, or an unlock all mean the Mac is awake, so a
+        // missed did-wake notification can't leave this stuck.
+        systemAsleep = false
+        if notification.name == Self.screenUnlockedNotification {
+            screenLocked = false
         }
         scheduleRecovery()
     }
 
+    /// Whether the user is at an awake, unlocked, frontmost session, checked against the session
+    /// itself and not only against the notifications received so far.
+    private func sessionAllowsReanchor() -> Bool {
+        if systemAsleep { return false }
+        if CGDisplayIsAsleep(CGMainDisplayID()) != 0 { return false }
+
+        guard let session = CGSessionCopyCurrentDictionary() as? [String: Any],
+              let onConsole = session[kCGSessionOnConsoleKey as String] as? Bool
+        else {
+            // No session information to go on; fall back to what the notifications said.
+            return !screenLocked
+        }
+
+        guard onConsole else { return false }
+        if session["CGSSessionScreenIsLocked"] as? Bool == true { return false }
+        // The session reports itself unlocked, so an unlock notification must have been missed.
+        screenLocked = false
+        return true
+    }
+
+    /// Re-checks the Dock a moment after something that may have moved it (launch, display
+    /// change, wake, unlock), once things have settled.
     private func scheduleRecovery() {
         recoveryTask?.cancel()
         dockReanchorer.cancel()
-        guard !sessionUnavailable else { return }
+        guard sessionAllowsReanchor() else { return }
         recoveryTask = Task { [weak self] in
             do {
                 try await Task.sleep(for: .seconds(1))
@@ -620,20 +740,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func reanchorDockNow() {
-        dockReanchorer.reanchor { [weak self] in
-            guard let self, !self.sessionUnavailable, self.isConfigured,
-                  self.monitor.isEnabled, self.isAccessibilityTrusted(),
-                  let active = self.profileManager.activeProfile else { return nil }
-            let snapshot = DisplaySnapshot.current()
-            let reachability = DisplayLayoutAnalyzer.reachabilityMap(
-                snapshot: snapshot,
-                edge: DockEdge.current(),
-                mirroringPolicy: active.mirroringPolicy
-            )
-            let resolvedAllowed = self.profileManager.resolveAllowedDisplayIDs(for: active, snapshot: snapshot)
-            return self.reanchorPlan(activeProfile: active, resolvedAllowed: resolvedAllowed,
-                                     reachability: reachability).target
+        startReanchor(mode: .manual)
+    }
+
+    private func startReanchor(mode: DockReanchorer.Mode) {
+        dockReanchorer.reanchor(mode: mode) { [weak self] in
+            guard let self else { return nil }
+            // The user is plainly present for a manual request; automatic ones wait for a usable
+            // session and stand down while the override modifier is held.
+            if mode == .automatic {
+                guard self.sessionAllowsReanchor(), !self.monitor.isOverrideModifierDown else { return nil }
+            }
+            return self.currentReanchorTarget()
         }
+    }
+
+    /// The display edge a re-anchor should aim for right now, or nil when one isn't possible.
+    private func currentReanchorTarget() -> DisplayEdgeReachability? {
+        guard isConfigured, let active = profileManager.activeProfile else { return nil }
+        let snapshot = DisplaySnapshot.current()
+        let reachability = DisplayLayoutAnalyzer.reachabilityMap(
+            snapshot: snapshot,
+            edge: DockEdge.current(),
+            mirroringPolicy: active.mirroringPolicy
+        )
+        let resolvedAllowed = profileManager.resolveAllowedDisplayIDs(for: active, snapshot: snapshot)
+        return reanchorPlan(
+            activeProfile: active,
+            resolvedAllowed: resolvedAllowed,
+            reachability: reachability
+        ).target
     }
 
     // MARK: - Helpers
@@ -681,6 +817,9 @@ extension AppDelegate {
     ) -> String? {
         guard isConfigured else { return "Set up DockPin first" }
         if activeProfile?.isEnabled == true { return nil }
+        if !NSScreen.screensHaveSeparateSpaces {
+            return "Requires “Displays have separate Spaces” (System Settings → Desktop & Dock)"
+        }
         if NSScreen.screens.count < 2 { return "Requires two or more displays" }
         guard activeProfile != nil else { return "Select a profile first" }
         if resolvedAllowed.isEmpty { return "Allow at least one display first" }
@@ -742,6 +881,15 @@ extension AppDelegate {
         guard activeProfile.isEnabled else {
             return ReanchorPlan(target: nil, disabledReason: "Enable DockPin first")
         }
+        guard isAccessibilityTrusted() else {
+            return ReanchorPlan(target: nil, disabledReason: "Grant Accessibility access first")
+        }
+        guard NSScreen.screensHaveSeparateSpaces else {
+            return ReanchorPlan(target: nil, disabledReason: "Requires “Displays have separate Spaces”")
+        }
+        guard reachability.count >= 2 else {
+            return ReanchorPlan(target: nil, disabledReason: "Requires two or more displays")
+        }
         guard !resolvedAllowed.isEmpty else {
             return ReanchorPlan(target: nil, disabledReason: "Allow at least one display first")
         }
@@ -759,14 +907,35 @@ extension AppDelegate {
         return ReanchorPlan(target: target, disabledReason: nil)
     }
 
+    /// The outside conditions that decide whether an enabled profile can lock. None of them
+    /// announces a change, so they're polled while a profile is enabled.
+    private struct EnvironmentState: Equatable {
+        var isTrusted: Bool
+        var dockEdge: DockEdge
+        var hasSeparateSpaces: Bool
+
+        @MainActor
+        static func current() -> EnvironmentState {
+            EnvironmentState(
+                isTrusted: AXIsProcessTrusted(),
+                dockEdge: .current(),
+                hasSeparateSpaces: NSScreen.screensHaveSeparateSpaces
+            )
+        }
+    }
+
     private func applyCurrentState(snapshot: DisplaySnapshot, attemptReanchor: Bool = false) {
-        recoveryTask?.cancel()
-        recoveryTask = nil
-        dockReanchorer.cancel()
+        let environment = EnvironmentState.current()
+        lastEnvironment = environment
+
         guard isConfigured else {
+            recoveryTask?.cancel()
+            recoveryTask = nil
             dockReanchorer.cancel()
             monitor.stopLocking()
             monitor.allowedDisplays.removeAll()
+            lockStatus = .notConfigured
+            updateEnvironmentWatcher(profileEnabled: false)
             updateIcon()
             return
         }
@@ -776,10 +945,9 @@ extension AppDelegate {
         }
         guard let active = profileManager.activeProfile else { return }
 
-        let dockEdge = DockEdge.current()
         let reachability = DisplayLayoutAnalyzer.reachabilityMap(
             snapshot: snapshot,
-            edge: dockEdge,
+            edge: environment.dockEdge,
             mirroringPolicy: active.mirroringPolicy
         )
         let resolvedAllowed = profileManager.resolveAllowedDisplayIDs(for: active, snapshot: snapshot)
@@ -787,11 +955,23 @@ extension AppDelegate {
         monitor.allowedDisplays = resolvedAllowed
         monitor.overrideModifier = active.overrideModifier
 
-        if active.isEnabled, isAccessibilityTrusted(), !reachableAllowed.isEmpty {
-            if !monitor.startLocking() {
-                promptAccessibilityIfNeeded()
-            }
+        func status(isLocking: Bool) -> LockStatus {
+            LockStatus.evaluate(
+                isConfigured: true,
+                profileEnabled: active.isEnabled,
+                isTrusted: environment.isTrusted,
+                hasSeparateSpaces: environment.hasSeparateSpaces,
+                hasAllowedDisplay: !resolvedAllowed.isEmpty,
+                hasReachableAllowedDisplay: !reachableAllowed.isEmpty,
+                isLocking: isLocking
+            )
+        }
+
+        if status(isLocking: true).permitsLocking {
+            monitor.startLocking()
         } else {
+            recoveryTask?.cancel()
+            recoveryTask = nil
             dockReanchorer.cancel()
             monitor.stopLocking()
         }
@@ -799,12 +979,65 @@ extension AppDelegate {
         if monitor.isEnabled {
             monitor.refreshScreenCache()
         }
+        lockStatus = status(isLocking: monitor.isEnabled)
 
-        if attemptReanchor, active.isEnabled, monitor.isEnabled {
-            reanchorDockNow()
+        if attemptReanchor, monitor.isEnabled {
+            startReanchor(mode: .automatic)
         }
 
+        #if DOCKPIN_DEV
+        UserDefaults.standard.set(String(describing: lockStatus), forKey: "dev.lockStatus")
+        #endif
+
+        updateEnvironmentWatcher(profileEnabled: active.isEnabled)
         updateIcon()
+    }
+
+    /// Runs the environment poll only while a profile is enabled; otherwise nothing depends on it.
+    private func updateEnvironmentWatcher(profileEnabled: Bool) {
+        guard profileEnabled else {
+            environmentTimer?.invalidate()
+            environmentTimer = nil
+            return
+        }
+        guard environmentTimer == nil else { return }
+
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.environmentTick()
+            }
+        }
+        timer.tolerance = 0.25
+        environmentTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func environmentTick() {
+        let environment = EnvironmentState.current()
+        guard environment != lastEnvironment else { return }
+        // Access was just granted, the Dock moved to another edge, and so on: re-evaluate, and
+        // check the Dock's position since locking may be starting only now.
+        applyCurrentState(snapshot: .current(), attemptReanchor: true)
+    }
+
+    private func reportProfileLoadIssueIfNeeded() {
+        guard let issue = profileManager.unacknowledgedLoadIssue else { return }
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        switch issue {
+        case .skippedProfiles(let count):
+            alert.messageText = count == 1
+                ? "One saved profile couldn’t be read"
+                : "\(count) saved profiles couldn’t be read"
+            alert.informativeText = "DockPin left them out and kept a backup copy of the original data. Your other profiles are unaffected."
+        case .unreadable:
+            alert.messageText = "DockPin couldn’t read your saved profiles"
+            alert.informativeText = "The saved data is damaged or was written by a different version. DockPin kept a backup copy and will ask you to set up again."
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
+        profileManager.acknowledgeLoadIssue()
     }
 
     private func v1KeysPresent() -> Bool {
@@ -853,7 +1086,11 @@ extension AppDelegate {
                 name: name,
                 isEnabled: enableAfterSetup,
                 overrideModifier: overrideModifier,
-                allowedDisplays: allowed
+                allowedDisplays: allowed,
+                triggerRequirements: ProfileManager.triggerRequirements(
+                    for: .current(),
+                    mirroringPolicy: .ignoreMirroredSecondaries
+                )
             )
             self.profileManager.addProfile(profile, makeActive: true)
             self.profileManager.setupCompleted = true

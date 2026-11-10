@@ -12,6 +12,11 @@ let package = Package(
             name: "DockPin",
             dependencies: ["Sparkle"],
             path: "Sources"
+        ),
+        .testTarget(
+            name: "DockPinTests",
+            dependencies: ["DockPin"],
+            path: "Tests"
         )
     ]
 )
