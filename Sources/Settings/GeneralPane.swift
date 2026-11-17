@@ -238,6 +238,7 @@ private struct UpdateStatusRow: View {
         guard let date = model.state.lastUpdateCheck else { return L("Not checked yet.") }
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
+        formatter.locale = Localization.shared.locale
         return L("Last checked %@.", formatter.localizedString(for: date, relativeTo: Date()))
     }
 

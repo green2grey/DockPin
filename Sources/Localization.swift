@@ -62,6 +62,16 @@ final class Localization: ObservableObject {
         preference == .system ? AppLanguage.systemDefault : preference
     }
 
+    /// A locale that matches the interface language, for dates and lists that macOS formats
+    /// for us. Following the system means following the system's locale too.
+    var locale: Locale {
+        switch preference {
+        case .system: return .autoupdatingCurrent
+        case .english: return Locale(identifier: "en")
+        case .simplifiedChinese: return Locale(identifier: "zh-Hans")
+        }
+    }
+
     /// The text for `key`, in the resolved language.
     func string(_ key: String) -> String {
         guard resolved == .simplifiedChinese else { return key }

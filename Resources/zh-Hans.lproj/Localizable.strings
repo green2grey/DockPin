@@ -276,3 +276,8 @@
 "Re-anchor Dock Now works again on current versions of macOS." = "「立即重新吸附程序坞」在当前版本的 macOS 上恢复可用。";
 "Auto-switch Profiles now switches." = "自动切换配置现在真的会切换了。";
 "The update feed couldn’t be reached. Check your internet connection and try again." = "无法访问更新源。请检查网络连接后重试。";
+"Can’t host the Dock on the %@: %@" = "无法把程序坞停在%@边缘：%@";
+"DockPin — %@" = "DockPin — %@";
+"Idle. No allowed display has a free %@ edge in this arrangement." = "空闲。此排列下没有允许的显示器有可用的%@边缘。";
+"No allowed display has a free %@ edge in this arrangement." = "此排列下没有允许的显示器有可用的%@边缘。";
+"\"%@\" can’t host the Dock on %@ because %@." = "“%@”无法把程序坞停在%@边缘，因为%@。";

@@ -49,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateStatusItem()
         refreshSettingsState()
         settingsWindowController.refreshTitle()
+        textWindows.refresh()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

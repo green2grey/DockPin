@@ -51,6 +51,16 @@ import Testing
         #expect(localization.resolved == .english || localization.resolved == .simplifiedChinese)
     }
 
+    @Test func localeFollowsTheChosenLanguage() {
+        let localization = Localization(defaults: InMemoryDefaults())
+
+        localization.preference = .simplifiedChinese
+        #expect(localization.locale.identifier.hasPrefix("zh"))
+
+        localization.preference = .english
+        #expect(localization.locale.identifier.hasPrefix("en"))
+    }
+
     /// The table that ships with the app has to parse, and has to cover the interface.
     @Test func shippedChineseTableCoversTheInterface() throws {
         let repositoryRoot = URL(fileURLWithPath: #filePath)

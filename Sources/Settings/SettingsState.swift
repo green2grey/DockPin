@@ -322,7 +322,10 @@ extension SettingsState {
         let names = requirements.keys
             .sorted { $0.storageKey < $1.storageKey }
             .map { displayNames[$0.storageKey] ?? L("an unknown display") }
-        return L("Linked to ") + ListFormatter.localizedString(byJoining: names)
+        let formatter = ListFormatter()
+        formatter.locale = Localization.shared.locale
+        let joined = formatter.string(from: names) ?? names.joined(separator: ", ")
+        return L("Linked to ") + joined
     }
 }
 

@@ -60,11 +60,11 @@ extension DockProfile {
 /// Names for keys, by hardware key code.
 enum KeyNames {
     private static let modifiers: [UInt16: String] = [
-        54: L("Right Command (⌘)"), 55: L("Left Command (⌘)"),
-        56: L("Left Shift (⇧)"), 60: L("Right Shift (⇧)"),
-        58: L("Left Option (⌥)"), 61: L("Right Option (⌥)"),
-        59: L("Left Control (⌃)"), 62: L("Right Control (⌃)"),
-        57: L("Caps Lock (⇪)"), 63: L("Fn (Globe)"),
+        54: "Right Command (⌘)", 55: "Left Command (⌘)",
+        56: "Left Shift (⇧)", 60: "Right Shift (⇧)",
+        58: "Left Option (⌥)", 61: "Right Option (⌥)",
+        59: "Left Control (⌃)", 62: "Right Control (⌃)",
+        57: "Caps Lock (⇪)", 63: "Fn (Globe)",
     ]
 
     private static let functionKeys: [UInt16: String] = [
@@ -74,13 +74,13 @@ enum KeyNames {
     ]
 
     private static let named: [UInt16: String] = [
-        36: L("Return (↩)"), 48: L("Tab (⇥)"), 49: L("Space"), 51: L("Delete (⌫)"), 53: L("Escape (⎋)"),
-        117: L("Forward Delete (⌦)"), 115: "Home", 119: "End", 116: "Page Up", 121: "Page Down",
-        123: L("Left Arrow (←)"), 124: L("Right Arrow (→)"), 125: L("Down Arrow (↓)"), 126: L("Up Arrow (↑)"),
-        114: "Help", 71: "Clear", 76: L("Keypad Enter"),
-        65: L("Keypad ."), 67: L("Keypad *"), 69: L("Keypad +"), 75: L("Keypad /"), 78: L("Keypad -"), 81: L("Keypad ="),
-        82: L("Keypad 0"), 83: L("Keypad 1"), 84: L("Keypad 2"), 85: L("Keypad 3"), 86: L("Keypad 4"),
-        87: L("Keypad 5"), 88: L("Keypad 6"), 89: L("Keypad 7"), 91: L("Keypad 8"), 92: L("Keypad 9"),
+        36: "Return (↩)", 48: "Tab (⇥)", 49: "Space", 51: "Delete (⌫)", 53: "Escape (⎋)",
+        117: "Forward Delete (⌦)", 115: "Home", 119: "End", 116: "Page Up", 121: "Page Down",
+        123: "Left Arrow (←)", 124: "Right Arrow (→)", 125: "Down Arrow (↓)", 126: "Up Arrow (↑)",
+        114: "Help", 71: "Clear", 76: "Keypad Enter",
+        65: "Keypad .", 67: "Keypad *", 69: "Keypad +", 75: "Keypad /", 78: "Keypad -", 81: "Keypad =",
+        82: "Keypad 0", 83: "Keypad 1", 84: "Keypad 2", 85: "Keypad 3", 86: "Keypad 4",
+        87: "Keypad 5", 88: "Keypad 6", 89: "Keypad 7", 91: "Keypad 8", 92: "Keypad 9",
     ]
 
     static func isModifier(_ keyCode: UInt16) -> Bool {
@@ -108,7 +108,7 @@ enum KeyNames {
     /// ordinary character keys, whose meaning depends on the keyboard layout.
     static func label(keyCode: UInt16, characters: String? = nil) -> String {
         if let name = modifiers[keyCode] ?? functionKeys[keyCode] ?? named[keyCode] {
-            return name
+            return L(name)
         }
         let typed = characters?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? ""
         // Keys without a character of their own report control codes or private-use

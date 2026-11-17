@@ -147,17 +147,17 @@ extension AppDelegate {
         menu.addItem(quit)
     }
 
-    private static let warningIcon: NSImage? = {
+    private static var warningIcon: NSImage? {
         let image = NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: L("Needs attention"))
         image?.isTemplate = true
         return image
-    }()
+    }
 
-    private static let updateIcon: NSImage? = {
+    private static var updateIcon: NSImage? {
         let image = NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: L("Update available"))
         image?.isTemplate = true
         return image
-    }()
+    }
 
     // MARK: - Menu actions
 
