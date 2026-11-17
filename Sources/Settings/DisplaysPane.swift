@@ -31,7 +31,7 @@ struct DisplaysPane: View {
                 set: { model.actions?.setPinningEnabled($0) }
             )) {
                 RowLabel(
-                    title: "Pin the Dock",
+                    title: L("Pin the Dock"),
                     caption: state.pinningEnabled
                         ? state.statusDetail
                         : (state.enableBlockedReason ?? state.statusDetail)
@@ -41,13 +41,13 @@ struct DisplaysPane: View {
 
             if state.lockStatus == .needsAccessibility {
                 LabeledContent {
-                    Button("Open System Settings…") { model.actions?.openAccessibilitySettings() }
+                    Button(L("Open System Settings…")) { model.actions?.openAccessibilitySettings() }
                 } label: {
                     IconRowLabel(
                         symbolName: "exclamationmark.triangle.fill",
                         symbolStyle: .yellow,
-                        title: "Accessibility access needed",
-                        caption: "DockPin can’t keep the Dock in place without it."
+                        title: L("Accessibility access needed"),
+                        caption: L("DockPin can’t keep the Dock in place without it.")
                     )
                 }
             }
@@ -70,14 +70,14 @@ struct DisplaysPane: View {
                     )
                 }
                 .disabled(display.isAllowed && !display.canDisallow)
-                .help(display.isAllowed && !display.canDisallow ? "At least one display has to stay allowed." : "")
+                .help(display.isAllowed && !display.canDisallow ? L("At least one display has to stay allowed.") : "")
             }
         } header: {
-            Text("Allow the Dock on")
+            Text(L("Allow the Dock on"))
         } footer: {
             SectionFootnote(state.connectedDisplayCount < 2
-                ? "Connect a second display to use DockPin."
-                : "The Dock stays on the displays you allow. At least one has to stay allowed.")
+                ? L("Connect a second display to use DockPin.")
+                : L("The Dock stays on the displays you allow. At least one has to stay allowed."))
         }
     }
 
@@ -101,15 +101,15 @@ struct DisplaysPane: View {
                     Text(modifier.label).tag(OverrideChoice.modifier(modifier))
                 }
                 Divider()
-                Text("Custom…").tag(OverrideChoice.custom)
+                Text(L("Custom…")).tag(OverrideChoice.custom)
             } label: {
-                RowLabel(title: "Override key", caption: "Hold it to move the Dock to any display.")
+                RowLabel(title: L("Override key"), caption: L("Hold it to move the Dock to any display."))
             }
 
             if recorder.isRecording || state.overrideChoice == .custom {
                 LabeledContent {
                     HStack(spacing: 10) {
-                        Text(recorder.isRecording ? "Press a key…" : (state.customOverrideKey?.label ?? "None"))
+                        Text(recorder.isRecording ? L("Press a key…") : (state.customOverrideKey?.label ?? L("None")))
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(recorder.isRecording ? Color.accentColor : Color.primary)
                             .padding(.horizontal, 10)
@@ -123,18 +123,18 @@ struct DisplaysPane: View {
                                     .strokeBorder(recorder.isRecording ? Color.accentColor : Color.primary.opacity(0.12))
                             )
                         if recorder.isRecording {
-                            Button("Cancel") { recorder.stop() }
+                            Button(L("Cancel")) { recorder.stop() }
                         } else {
-                            Button("Record…") { recordKey() }
+                            Button(L("Record…")) { recordKey() }
                         }
                     }
                 } label: {
                     RowLabel(
-                        title: "Custom key",
+                        title: L("Custom key"),
                         caption: recorder.isRecording
-                            ? "Press the key to use, or Escape to cancel."
+                            ? L("Press the key to use, or Escape to cancel.")
                             : (state.customOverrideKey?.doesSomethingWhenHeld == true
-                                ? "This key still does its usual job while you hold it. A function key or a right-hand modifier avoids that."
+                                ? L("This key still does its usual job while you hold it. A function key or a right-hand modifier avoids that.")
                                 : nil)
                     )
                 }
@@ -144,8 +144,8 @@ struct DisplaysPane: View {
                 Text(state.dockEdge.label)
             } label: {
                 RowLabel(
-                    title: "Dock position",
-                    caption: "Set in System Settings → Desktop & Dock. DockPin follows it."
+                    title: L("Dock position"),
+                    caption: L("Set in System Settings → Desktop & Dock. DockPin follows it.")
                 )
             }
         }
@@ -160,13 +160,13 @@ struct DisplaysPane: View {
     private var reanchorSection: some View {
         Section {
             LabeledContent {
-                Button("Re-anchor Now") { model.actions?.reanchorNow() }
+                Button(L("Re-anchor Now")) { model.actions?.reanchorNow() }
                     .disabled(state.reanchorDisabledReason != nil)
             } label: {
                 RowLabel(
-                    title: "Re-anchor the Dock",
+                    title: L("Re-anchor the Dock"),
                     caption: state.reanchorDisabledReason
-                        ?? "Brings the Dock back to the allowed display by briefly moving the pointer to its edge."
+                        ?? L("Brings the Dock back to the allowed display by briefly moving the pointer to its edge.")
                 )
             }
         }
@@ -175,14 +175,14 @@ struct DisplaysPane: View {
     private var setupSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 10) {
-                Text(state.storedProfilesUnreadable ? "Your saved profiles couldn’t be read" : "Set up DockPin")
+                Text(state.storedProfilesUnreadable ? L("Your saved profiles couldn’t be read") : L("Set up DockPin"))
                     .font(.headline)
                 Text(state.storedProfilesUnreadable
-                    ? "DockPin kept a backup copy of the saved data. Start fresh to create a new profile."
-                    : "Create a profile, choose the displays the Dock is allowed on, then turn on pinning.")
+                    ? L("DockPin kept a backup copy of the saved data. Start fresh to create a new profile.")
+                    : L("Create a profile, choose the displays the Dock is allowed on, then turn on pinning."))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Button(state.storedProfilesUnreadable ? "Start Fresh" : "Set Up") {
+                Button(state.storedProfilesUnreadable ? L("Start Fresh") : L("Set Up")) {
                     model.actions?.createFirstProfile()
                 }
                 .buttonStyle(.borderedProminent)

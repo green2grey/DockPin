@@ -9,15 +9,31 @@ struct GeneralPane: View {
     var body: some View {
         Form {
             Section {
+                Picker(selection: Binding(
+                    get: { Localization.shared.preference },
+                    set: { Localization.shared.preference = $0 }
+                )) {
+                    ForEach(AppLanguage.allCases) { language in
+                        Text(language.displayName).tag(language)
+                    }
+                } label: {
+                    RowLabel(
+                        title: L("Language"),
+                        caption: L("Automatic follows the language your Mac uses.")
+                    )
+                }
+            }
+
+            Section {
                 Toggle(isOn: Binding(
                     get: { state.showsMenuBarIcon },
                     set: { model.actions?.setShowsMenuBarIcon($0) }
                 )) {
                     RowLabel(
-                        title: "Show in menu bar",
+                        title: L("Show in menu bar"),
                         caption: state.showsMenuBarIcon
-                            ? "Turn off to keep DockPin out of the menu bar."
-                            : "Hidden. Open DockPin again from Applications or Spotlight to get back here. The icon returns by itself if DockPin needs your attention."
+                            ? L("Turn off to keep DockPin out of the menu bar.")
+                            : L("Hidden. Open DockPin again from Applications or Spotlight to get back here. The icon returns by itself if DockPin needs your attention.")
                     )
                 }
 
@@ -26,7 +42,7 @@ struct GeneralPane: View {
                     set: { model.actions?.setLaunchAtLogin($0) }
                 )) {
                     RowLabel(
-                        title: "Launch at login",
+                        title: L("Launch at login"),
                         caption: state.launchAtLoginError,
                         captionStyle: .orange
                     )
@@ -34,11 +50,11 @@ struct GeneralPane: View {
 
                 if state.launchAtLogin == .needsApproval {
                     LabeledContent {
-                        Button("Open Login Items…") { model.actions?.openLoginItemsSettings() }
+                        Button(L("Open Login Items…")) { model.actions?.openLoginItemsSettings() }
                     } label: {
                         RowLabel(
-                            title: "Waiting for approval",
-                            caption: "Allow DockPin under System Settings → General → Login Items."
+                            title: L("Waiting for approval"),
+                            caption: L("Allow DockPin under System Settings → General → Login Items.")
                         )
                     }
                 }
@@ -47,37 +63,37 @@ struct GeneralPane: View {
             Section {
                 LabeledContent {
                     if state.isAccessibilityTrusted {
-                        Label("Granted", systemImage: "checkmark.circle.fill")
+                        Label(L("Granted"), systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                     } else {
-                        Button("Open System Settings…") { model.actions?.openAccessibilitySettings() }
+                        Button(L("Open System Settings…")) { model.actions?.openAccessibilitySettings() }
                     }
                 } label: {
                     RowLabel(
-                        title: "Accessibility access",
-                        caption: "DockPin uses it to stop the pointer from summoning the Dock on other displays."
+                        title: L("Accessibility access"),
+                        caption: L("DockPin uses it to stop the pointer from summoning the Dock on other displays.")
                     )
                 }
             } header: {
-                Text("Permissions")
+                Text(L("Permissions"))
             }
 
             Section {
-                LabeledContent("Version", value: state.version)
+                LabeledContent(L("Version"), value: state.version)
                 UpdateStatusRow(model: model)
-                Toggle("Check for updates automatically", isOn: Binding(
+                Toggle(L("Check for updates automatically"), isOn: Binding(
                     get: { state.automaticallyChecksForUpdates },
                     set: { model.actions?.setAutomaticUpdateChecks($0) }
                 ))
             } header: {
-                Text("Updates")
+                Text(L("Updates"))
             }
 
             Section {
-                linkRow("What’s New", symbol: "sparkles") { model.actions?.showWhatsNew() }
-                linkRow("DockPin Help", symbol: "questionmark.circle") { model.actions?.showHelp() }
-                linkRow("Website", symbol: "globe") { model.actions?.openWebsite() }
-                linkRow("Report a Problem", symbol: "ladybug") { model.actions?.openIssueTracker() }
+                linkRow(L("What’s New"), symbol: "sparkles") { model.actions?.showWhatsNew() }
+                linkRow(L("DockPin Help"), symbol: "questionmark.circle") { model.actions?.showHelp() }
+                linkRow(L("Website"), symbol: "globe") { model.actions?.openWebsite() }
+                linkRow(L("Report a Problem"), symbol: "ladybug") { model.actions?.openIssueTracker() }
             }
         }
         .formStyle(.grouped)
@@ -100,28 +116,28 @@ private struct UpdateStatusRow: View {
         switch model.state.updateStatus {
         case .idle:
             LabeledContent {
-                Button("Check Now") { model.actions?.checkForUpdates() }
+                Button(L("Check Now")) { model.actions?.checkForUpdates() }
                     .disabled(!model.state.canCheckForUpdates)
             } label: {
-                RowLabel(title: "Check for updates", caption: lastCheckedCaption)
+                RowLabel(title: L("Check for updates"), caption: lastCheckedCaption)
             }
 
         case .checking:
             LabeledContent {
-                Button("Cancel") { model.actions?.cancelUpdate() }
+                Button(L("Cancel")) { model.actions?.cancelUpdate() }
             } label: {
-                busyLabel("Checking for updates…")
+                busyLabel(L("Checking for updates…"))
             }
 
         case .upToDate(let message):
             LabeledContent {
-                Button("Check Again") { model.actions?.checkForUpdates() }
+                Button(L("Check Again")) { model.actions?.checkForUpdates() }
                     .disabled(!model.state.canCheckForUpdates)
             } label: {
                 IconRowLabel(
                     symbolName: "checkmark.circle.fill",
                     symbolStyle: .green,
-                    title: "DockPin is up to date",
+                    title: L("DockPin is up to date"),
                     caption: message
                 )
             }
@@ -131,10 +147,10 @@ private struct UpdateStatusRow: View {
                 LabeledContent {
                     HStack(spacing: 8) {
                         Menu {
-                            Button("Open Release Page…") { model.actions?.showUpdateDetails() }
+                            Button(L("Open Release Page…")) { model.actions?.showUpdateDetails() }
                             Divider()
-                            Button("Remind Me Later") { model.actions?.postponeUpdate() }
-                            Button("Skip This Version") { model.actions?.skipUpdate() }
+                            Button(L("Remind Me Later")) { model.actions?.postponeUpdate() }
+                            Button(L("Skip This Version")) { model.actions?.skipUpdate() }
                         } label: {
                             Image(systemName: "ellipsis.circle")
                                 .font(.system(size: 15))
@@ -142,9 +158,9 @@ private struct UpdateStatusRow: View {
                         .menuStyle(.borderlessButton)
                         .menuIndicator(.hidden)
                         .fixedSize()
-                        .accessibilityLabel("More update options")
+                        .accessibilityLabel(L("More update options"))
 
-                        Button(info.isInformationOnly ? "Learn More…" : "Install Update") {
+                        Button(info.isInformationOnly ? L("Learn More…") : L("Install Update")) {
                             model.actions?.installUpdate()
                         }
                         .buttonStyle(.borderedProminent)
@@ -153,8 +169,8 @@ private struct UpdateStatusRow: View {
                     IconRowLabel(
                         symbolName: "arrow.down.circle.fill",
                         symbolStyle: .accentColor,
-                        title: "DockPin \(info.version) is available",
-                        caption: info.isCritical ? "This is an important update." : nil
+                        title: L("DockPin %@ is available", info.version),
+                        caption: info.isCritical ? L("This is an important update.") : nil
                     )
                 }
 
@@ -165,45 +181,45 @@ private struct UpdateStatusRow: View {
 
         case .downloading(let fraction):
             LabeledContent {
-                Button("Cancel") { model.actions?.cancelUpdate() }
+                Button(L("Cancel")) { model.actions?.cancelUpdate() }
             } label: {
                 progressLabel(
-                    fraction.map { "Downloading update… \(Int(($0 * 100).rounded()))%" } ?? "Downloading update…",
+                    fraction.map { L("Downloading update… %@%%", String(Int(($0 * 100).rounded()))) } ?? L("Downloading update…"),
                     fraction: fraction
                 )
             }
 
         case .preparing(let fraction):
-            progressLabel("Preparing update…", fraction: fraction)
+            progressLabel(L("Preparing update…"), fraction: fraction)
 
         case .readyToInstall:
             LabeledContent {
                 HStack(spacing: 8) {
-                    Button("Later") { model.actions?.postponeUpdate() }
-                    Button("Install and Relaunch") { model.actions?.installUpdateAndRelaunch() }
+                    Button(L("Later")) { model.actions?.postponeUpdate() }
+                    Button(L("Install and Relaunch")) { model.actions?.installUpdateAndRelaunch() }
                         .buttonStyle(.borderedProminent)
                 }
             } label: {
                 IconRowLabel(
                     symbolName: "arrow.down.circle.fill",
                     symbolStyle: .accentColor,
-                    title: "Update ready to install",
-                    caption: "DockPin will quit and reopen. Choosing Later installs it when you quit."
+                    title: L("Update ready to install"),
+                    caption: L("DockPin will quit and reopen. Choosing Later installs it when you quit.")
                 )
             }
 
         case .installing:
-            busyLabel("Installing update…")
+            busyLabel(L("Installing update…"))
 
         case .failed(let message):
             LabeledContent {
-                Button("Try Again") { model.actions?.checkForUpdates() }
+                Button(L("Try Again")) { model.actions?.checkForUpdates() }
                     .disabled(!model.state.canCheckForUpdates)
             } label: {
                 IconRowLabel(
                     symbolName: "exclamationmark.triangle.fill",
                     symbolStyle: .yellow,
-                    title: "Couldn’t update",
+                    title: L("Couldn’t update"),
                     caption: message
                 )
             }
@@ -212,17 +228,17 @@ private struct UpdateStatusRow: View {
             IconRowLabel(
                 symbolName: "exclamationmark.triangle.fill",
                 symbolStyle: .yellow,
-                title: "Updates aren’t available",
+                title: L("Updates aren’t available"),
                 caption: message
             )
         }
     }
 
     private var lastCheckedCaption: String {
-        guard let date = model.state.lastUpdateCheck else { return "Not checked yet." }
+        guard let date = model.state.lastUpdateCheck else { return L("Not checked yet.") }
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
-        return "Last checked \(formatter.localizedString(for: date, relativeTo: Date()))."
+        return L("Last checked %@.", formatter.localizedString(for: date, relativeTo: Date()))
     }
 
     private func busyLabel(_ text: String) -> some View {
@@ -257,7 +273,7 @@ private struct ReleaseNotesList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("What’s new")
+            Text(L("What’s new"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
             ScrollView {

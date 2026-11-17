@@ -17,23 +17,28 @@ enum DockEdge: String, CaseIterable, Codable, Sendable {
         return edge
     }
 
+    /// The edge's name, in the interface language: "Left" / "左".
     var label: String {
-        rawValue.capitalized
+        switch self {
+        case .left: return L("left")
+        case .bottom: return L("bottom")
+        case .right: return L("right")
+        }
     }
 
     var blockedDirectionDescription: String {
         switch self {
         case .bottom:
-            return "another display is directly below it"
+            return L("another display is directly below it")
         case .left:
-            return "another display is directly to its left"
+            return L("another display is directly to its left")
         case .right:
-            return "another display is directly to its right"
+            return L("another display is directly to its right")
         }
     }
 
     var requirementDescription: String {
-        "\(rawValue) edge"
+        L("%@ edge", label)
     }
 }
 
