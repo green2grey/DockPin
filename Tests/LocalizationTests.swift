@@ -51,6 +51,17 @@ import Testing
         #expect(localization.resolved == .english || localization.resolved == .simplifiedChinese)
     }
 
+    /// A recorded key keeps the layout-dependent name it was given, but special keys are
+    /// looked up again so their name follows the interface language.
+    @Test func recordedSpecialKeysTakeTheirNameFromTheKeyCode() {
+        let space = CustomOverrideKey(keyCode: 49, label: "old name")
+        #expect(space.displayLabel == KeyNames.label(keyCode: 49))
+        #expect(space.doesSomethingWhenHeld)
+
+        let character = CustomOverrideKey(keyCode: 0, label: "A")
+        #expect(character.displayLabel == "A")
+    }
+
     @Test func localeFollowsTheChosenLanguage() {
         let localization = Localization(defaults: InMemoryDefaults())
 

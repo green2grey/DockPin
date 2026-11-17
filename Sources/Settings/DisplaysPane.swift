@@ -109,7 +109,7 @@ struct DisplaysPane: View {
             if recorder.isRecording || state.overrideChoice == .custom {
                 LabeledContent {
                     HStack(spacing: 10) {
-                        Text(recorder.isRecording ? L("Press a key…") : (state.customOverrideKey?.label ?? L("None")))
+                        Text(recorder.isRecording ? L("Press a key…") : (state.customOverrideKey?.displayLabel ?? L("None")))
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(recorder.isRecording ? Color.accentColor : Color.primary)
                             .padding(.horizontal, 10)
