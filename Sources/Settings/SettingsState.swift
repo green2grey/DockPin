@@ -228,7 +228,7 @@ extension SettingsState {
                 hasDock: dockDisplay == display.displayID,
                 blockedReason: isReachable
                     ? nil
-                    : L("Can’t host the Dock on the %@: %@", dockEdge.label, dockEdge.blockedDirectionDescription),
+                    : L("Can’t host the Dock on the %@: %@", dockEdge.nameInSentence, dockEdge.blockedDirectionDescription),
                 // Turning this display off removes every stored ID that covers it.
                 canDisallow: allowed.count - covering.count >= 1
             )
@@ -278,7 +278,7 @@ extension SettingsState {
         case .allowedDisplayMissing:
             return L("Idle. None of the allowed displays is connected.")
         case .edgeBlocked:
-            return L("Idle. No allowed display has a free %@ edge in this arrangement.", dockEdge.label)
+            return L("Idle. No allowed display has a free %@ edge in this arrangement.", dockEdge.nameInSentence)
         case .tapUnavailable:
             return L("Couldn’t start. Try quitting and reopening DockPin.")
         }
@@ -310,7 +310,7 @@ extension SettingsState {
         let allowedConnected = connected.filter { active.allows($0.stableID) }
         if allowedConnected.isEmpty { return L("Allow at least one connected display first.") }
         if !allowedConnected.contains(where: { reachability[$0.displayID]?.isReachable == true }) {
-            return L("No allowed display has a free %@ edge in this arrangement.", dockEdge.label)
+            return L("No allowed display has a free %@ edge in this arrangement.", dockEdge.nameInSentence)
         }
         return nil
     }

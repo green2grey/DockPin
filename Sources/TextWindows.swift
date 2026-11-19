@@ -14,10 +14,13 @@ final class TextWindows {
 
     func show(id: String, title: @autoclosure @escaping () -> String,
               content: @autoclosure @escaping () -> NSAttributedString) {
-        if let page = pages[id] {
+        if let existing = pages[id] {
             // The text may have changed since the window was made (a newer changelog after an
-            // update), and so may the language it is written in.
-            page.window.title = title()
+            // update), and so may the language it is written in. The new builders replace the
+            // old ones, so a later language change redraws what is on show now.
+            let page = Page(window: existing.window, title: title, content: content)
+            pages[id] = page
+            page.window.title = page.title()
             setText(page.content(), in: page.window)
             page.window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)

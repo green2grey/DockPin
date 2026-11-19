@@ -18,6 +18,7 @@
 "Auto-switch Profiles now switches." = "自动切换配置现在真的会切换了。";
 "Auto-switching" = "自动切换";
 "Automatic follows the language your Mac uses." = "自动跟随 Mac 的系统语言。";
+"Bottom" = "底";
 "Brings the Dock back to the allowed display by briefly moving the pointer to its edge." = "短暂把指针移到允许显示器的边缘，从而把程序坞拉回来。";
 "Cancel" = "取消";
 "Caps Lock (⇪)" = "Caps Lock（⇪）";
@@ -29,9 +30,9 @@
 "Choose Custom… to use any key: click Record…, then press it. A function key such as F13 or a right-hand modifier works best, because an ordinary key still types while you hold it." = "选择“自定义…”可使用任意按键：点按“录制…”，然后按下该键。功能键（例如 F13）或右侧修饰键效果最好，因为普通按键在按住时仍会输入字符。";
 "Click DockPin in the menu bar and choose DockPin Settings…." = "点按菜单栏中的 DockPin，然后选择“DockPin 设置…”。";
 "Close" = "关闭";
-"Command (\\u{2318})" = "Command（\\u{2318}）";
+"Command (⌘)" = "Command（⌘）";
 "Connect a second display to use DockPin." = "接入第二台显示器后即可使用 DockPin。";
-"Control (\\u{2303})" = "Control（\\u{2303}）";
+"Control (⌃)" = "Control（⌃）";
 "Copy" = "拷贝";
 "Couldn’t change the login item: %@" = "无法更改登录项：%@";
 "Couldn’t start blocking — try relaunching DockPin" = "无法开始拦截 — 请尝试重新启动 DockPin";
@@ -129,6 +130,7 @@
 "Launch at Login" = "登录时启动";
 "Launch at login" = "登录时启动";
 "Learn More…" = "了解更多…";
+"Left" = "左";
 "Left Arrow (←)" = "左方向键（←）";
 "Left Command (⌘)" = "左侧 Command（⌘）";
 "Left Control (⌃)" = "左侧 Control（⌃）";
@@ -156,7 +158,7 @@
 "Open Release Page…" = "打开发布页面…";
 "Open Settings" = "打开设置";
 "Open System Settings…" = "打开系统设置…";
-"Option (\\u{2325})" = "Option（\\u{2325}）";
+"Option (⌥)" = "Option（⌥）";
 "Options for %@" = "%@的选项";
 "Override Key" = "临时放行键";
 "Override key" = "临时放行键";
@@ -188,6 +190,7 @@
 "Resume" = "继续";
 "Resume Auto-switching" = "恢复自动切换";
 "Return (↩)" = "Return（↩）";
+"Right" = "右";
 "Right Arrow (→)" = "右方向键（→）";
 "Right Command (⌘)" = "右侧 Command（⌘）";
 "Right Control (⌃)" = "右侧 Control（⌃）";
@@ -199,7 +202,7 @@
 "Set in System Settings → Desktop & Dock. DockPin follows it." = "在系统设置 → 桌面与程序坞中设定，DockPin 会跟随它。";
 "Set up DockPin" = "设置 DockPin";
 "Set up DockPin first." = "请先设置 DockPin。";
-"Shift (\\u{21E7})" = "Shift（\\u{21E7}）";
+"Shift (⇧)" = "Shift（⇧）";
 "Show in menu bar" = "在菜单栏中显示";
 "Skip This Version" = "跳过此版本";
 "Space" = "空格";

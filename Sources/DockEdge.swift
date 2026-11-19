@@ -17,8 +17,17 @@ enum DockEdge: String, CaseIterable, Codable, Sendable {
         return edge
     }
 
-    /// The edge's name, in the interface language: "Left" / "左".
+    /// The edge's name on its own, as a label: "Bottom" / "底".
     var label: String {
+        switch self {
+        case .left: return L("Left")
+        case .bottom: return L("Bottom")
+        case .right: return L("Right")
+        }
+    }
+
+    /// The edge's name inside a sentence: "a free bottom edge" / "底".
+    var nameInSentence: String {
         switch self {
         case .left: return L("left")
         case .bottom: return L("bottom")
@@ -38,7 +47,7 @@ enum DockEdge: String, CaseIterable, Codable, Sendable {
     }
 
     var requirementDescription: String {
-        L("%@ edge", label)
+        L("%@ edge", nameInSentence)
     }
 }
 
