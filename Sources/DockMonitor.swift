@@ -12,11 +12,11 @@ enum ModifierOption: Int, CaseIterable, Codable, Sendable {
 
     var label: String {
         switch self {
-        case .none:    return "None"
-        case .option:  return "Option (\u{2325})"
-        case .control: return "Control (\u{2303})"
-        case .shift:   return "Shift (\u{21E7})"
-        case .command: return "Command (\u{2318})"
+        case .none:    return L("None")
+        case .option:  return L("Option (\u{2325})")
+        case .control: return L("Control (\u{2303})")
+        case .shift:   return L("Shift (\u{21E7})")
+        case .command: return L("Command (\u{2318})")
         }
     }
 

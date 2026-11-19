@@ -53,15 +53,15 @@ enum LockStatus: Equatable, Sendable {
         case .notConfigured, .disabled, .locking:
             return nil
         case .needsAccessibility:
-            return "Accessibility access needed"
+            return L("Accessibility access needed")
         case .separateSpacesOff:
-            return "Off: “Displays have separate Spaces” is disabled"
+            return L("Off: “Displays have separate Spaces” is disabled")
         case .allowedDisplayMissing:
-            return "Idle: no allowed display connected"
+            return L("Idle: no allowed display connected")
         case .edgeBlocked:
-            return "Idle: \(dockEdge.requirementDescription) blocked on allowed displays"
+            return L("Idle: %@ blocked on allowed displays", dockEdge.requirementDescription)
         case .tapUnavailable:
-            return "Couldn’t start blocking — try relaunching DockPin"
+            return L("Couldn’t start blocking — try relaunching DockPin")
         }
     }
 }

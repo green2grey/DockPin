@@ -17,6 +17,7 @@ On a Mac with several displays, macOS moves the Dock to whichever screen you pus
 - **Layout warnings** when your display arrangement leaves a display with no usable Dock edge
 - **Stays out of the way**: a short menu in the menu bar, and the icon can be hidden
 - **Updates itself**, and shows what's new before you install
+- **Interface language**: English or Simplified Chinese, switched in Settings → General
 
 <p align="center">
   <img src="docs/screenshots/settings-profiles.png" alt="DockPin settings: profiles linked to displays" width="410">

@@ -13,6 +13,15 @@ struct CustomOverrideKey: Codable, Equatable, Hashable, Sendable {
     var doesSomethingWhenHeld: Bool {
         !KeyNames.isModifier(keyCode) && !KeyNames.isFunctionKey(keyCode)
     }
+
+    /// What to show for the key right now.
+    ///
+    /// Modifiers, function keys and named keys are looked up again, so their name follows the
+    /// interface language. Keys that type a character keep the name captured when they were
+    /// recorded, because that depends on the keyboard layout the user was typing with.
+    var displayLabel: String {
+        KeyNames.isSpecialKey(keyCode) ? KeyNames.label(keyCode: keyCode) : label
+    }
 }
 
 /// What the user holds to let the Dock move freely.
@@ -91,6 +100,12 @@ enum KeyNames {
         functionKeys[keyCode] != nil
     }
 
+    /// A key with a fixed name — a modifier, a function key or a named key such as Space —
+    /// whose label can be looked up again in the current language.
+    static func isSpecialKey(_ keyCode: UInt16) -> Bool {
+        modifiers[keyCode] != nil || functionKeys[keyCode] != nil || named[keyCode] != nil
+    }
+
     /// The modifier flag a modifier key sets while it's down, used to tell a press from a release.
     static func modifierFlag(for keyCode: UInt16) -> NSEvent.ModifierFlags? {
         switch keyCode {
@@ -108,7 +123,7 @@ enum KeyNames {
     /// ordinary character keys, whose meaning depends on the keyboard layout.
     static func label(keyCode: UInt16, characters: String? = nil) -> String {
         if let name = modifiers[keyCode] ?? functionKeys[keyCode] ?? named[keyCode] {
-            return name
+            return L(name)
         }
         let typed = characters?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? ""
         // Keys without a character of their own report control codes or private-use
@@ -117,6 +132,6 @@ enum KeyNames {
         if !typed.isEmpty, typed.unicodeScalars.allSatisfy({ !unprintable.contains($0.properties.generalCategory) }) {
             return typed
         }
-        return "Key \(keyCode)"
+        return L("Key %@", String(keyCode))
     }
 }

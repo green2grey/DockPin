@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import ServiceManagement
 
 /// The app's engine room: lifecycle, the decision of whether DockPin should be locking right now,
@@ -30,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // itself so one missed notification can't switch re-anchoring off for good.
     private var systemAsleep = false
     private var screenLocked = false
+    private var cancellables = Set<AnyCancellable>()
 
     private static let screenLockedNotification = Notification.Name("com.apple.screenIsLocked")
     private static let screenUnlockedNotification = Notification.Name("com.apple.screenIsUnlocked")
@@ -38,6 +40,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let overrideGracePeriod: TimeInterval = 5
 
     // MARK: - Lifecycle
+
+    /// Rebuilds the parts of the interface that are made once and kept: the main menu, the
+    /// status item's tooltip, and the window title. Menus that are filled on demand pick the
+    /// language up by themselves.
+    private func applyLanguageChange() {
+        MainMenu.install()
+        updateStatusItem()
+        refreshSettingsState()
+        settingsWindowController.refreshTitle()
+        textWindows.refresh()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Worked out first, before anything below leaves its own traces in the saved settings.
@@ -53,6 +66,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         MainMenu.install()
         setupStatusBar()
+
+        // The language can change while the app runs: rebuild everything that is built once.
+        Localization.shared.objectWillChange
+            .sink { [weak self] _ in
+                DispatchQueue.main.async { self?.applyLanguageChange() }
+            }
+            .store(in: &cancellables)
         settingsModel.actions = self
         settingsWindowController.onVisibilityChange = { [weak self] visible in
             self?.isSettingsVisible = visible
@@ -294,31 +314,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         reachability: [CGDirectDisplayID: DisplayEdgeReachability]
     ) -> ReanchorPlan {
         guard let activeProfile else {
-            return ReanchorPlan(target: nil, disabledReason: "Set up DockPin first.")
+            return ReanchorPlan(target: nil, disabledReason: L("Set up DockPin first."))
         }
         guard activeProfile.isEnabled else {
-            return ReanchorPlan(target: nil, disabledReason: "Turn on pinning first.")
+            return ReanchorPlan(target: nil, disabledReason: L("Turn on pinning first."))
         }
         guard isAccessibilityTrusted() else {
-            return ReanchorPlan(target: nil, disabledReason: "Grant Accessibility access first.")
+            return ReanchorPlan(target: nil, disabledReason: L("Grant Accessibility access first."))
         }
         guard NSScreen.screensHaveSeparateSpaces else {
-            return ReanchorPlan(target: nil, disabledReason: "Needs “Displays have separate Spaces” turned on.")
+            return ReanchorPlan(target: nil, disabledReason: L("Needs “Displays have separate Spaces” turned on."))
         }
         guard reachability.count >= 2 else {
-            return ReanchorPlan(target: nil, disabledReason: "Needs two or more displays.")
+            return ReanchorPlan(target: nil, disabledReason: L("Needs two or more displays."))
         }
         guard !resolvedAllowed.isEmpty else {
-            return ReanchorPlan(target: nil, disabledReason: "None of the allowed displays is connected.")
+            return ReanchorPlan(target: nil, disabledReason: L("None of the allowed displays is connected."))
         }
         guard resolvedAllowed.count == 1, let displayID = resolvedAllowed.first else {
             return ReanchorPlan(
                 target: nil,
-                disabledReason: "Works when exactly one connected display is allowed, so DockPin knows where to send the Dock."
+                disabledReason: L("Works when exactly one connected display is allowed, so DockPin knows where to send the Dock.")
             )
         }
         guard let target = reachability[displayID] else {
-            return ReanchorPlan(target: nil, disabledReason: "The allowed display isn’t available right now.")
+            return ReanchorPlan(target: nil, disabledReason: L("The allowed display isn’t available right now."))
         }
         guard target.isReachable else {
             return ReanchorPlan(target: nil, disabledReason: target.blockedReason)
@@ -529,12 +549,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch issue {
         case .skippedProfiles(let count):
             alert.messageText = count == 1
-                ? "One saved profile couldn’t be read"
-                : "\(count) saved profiles couldn’t be read"
-            alert.informativeText = "DockPin left them out and kept a backup copy of the original data. Your other profiles are unaffected."
+                ? L("One saved profile couldn’t be read")
+                : L("%@ saved profiles couldn’t be read", String(count))
+            alert.informativeText = L("DockPin left them out and kept a backup copy of the original data. Your other profiles are unaffected.")
         case .unreadable:
-            alert.messageText = "DockPin couldn’t read your saved profiles"
-            alert.informativeText = "The saved data is damaged or was written by a different version. DockPin kept a backup copy; you can start fresh from Settings."
+            alert.messageText = L("DockPin couldn’t read your saved profiles")
+            alert.informativeText = L("The saved data is damaged or was written by a different version. DockPin kept a backup copy; you can start fresh from Settings.")
         }
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
@@ -555,11 +575,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard v1KeysPresent(), !profileManager.resetNoticeShown else { return false }
 
         let alert = NSAlert()
-        alert.messageText = "DockPin Has Been Updated"
-        alert.informativeText = "This update resets previous settings. Please choose your displays again."
+        alert.messageText = L("DockPin Has Been Updated")
+        alert.informativeText = L("This update resets previous settings. Please choose your displays again.")
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Open Settings")
-        alert.addButton(withTitle: "Later")
+        alert.addButton(withTitle: L("Open Settings"))
+        alert.addButton(withTitle: L("Later"))
         NSApp.activate(ignoringOtherApps: true)
         let response = alert.runModal()
 
