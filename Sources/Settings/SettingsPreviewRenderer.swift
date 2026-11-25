@@ -108,6 +108,12 @@ enum SettingsPreviewRenderer {
         hiddenInputs.launchAtLogin = .needsApproval
         hiddenInputs.isAccessibilityTrusted = false
 
+        // A build without Sparkle, updated by a package manager.
+        var managedInputs = generalInputs
+        managedInputs.updateStatus = .managedExternally
+        managedInputs.showsAutomaticUpdateToggle = false
+        managedInputs.canCheckForUpdates = false
+
         func general(_ name: String, _ status: UpdateStatus) -> Scene {
             var updating = generalInputs
             updating.updateStatus = status
@@ -127,6 +133,7 @@ enum SettingsPreviewRenderer {
             general("11-update-downloading", .downloading(fraction: 0.42)),
             general("12-update-ready", .readyToInstall),
             general("13-update-failed", .failed(L("The update feed couldn’t be reached. Check your internet connection and try again."))),
+            Scene(name: "14-update-managed-externally", pane: .general, state: SettingsState(managedInputs)),
             Scene(name: "1-displays-pinned", pane: .displays, state: pinned),
             Scene(name: "2-displays-needs-access", pane: .displays, state: SettingsState(waitingInputs)),
             Scene(name: "3-displays-off", pane: .displays, state: SettingsState(offInputs)),

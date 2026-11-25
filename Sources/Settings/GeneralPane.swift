@@ -81,10 +81,12 @@ struct GeneralPane: View {
             Section {
                 LabeledContent(L("Version"), value: state.version)
                 UpdateStatusRow(model: model)
-                Toggle(L("Check for updates automatically"), isOn: Binding(
-                    get: { state.automaticallyChecksForUpdates },
-                    set: { model.actions?.setAutomaticUpdateChecks($0) }
-                ))
+                if state.showsAutomaticUpdateToggle {
+                    Toggle(L("Check for updates automatically"), isOn: Binding(
+                        get: { state.automaticallyChecksForUpdates },
+                        set: { model.actions?.setAutomaticUpdateChecks($0) }
+                    ))
+                }
             } header: {
                 Text(L("Updates"))
             }
@@ -230,6 +232,14 @@ private struct UpdateStatusRow: View {
                 symbolStyle: .yellow,
                 title: L("Updates aren’t available"),
                 caption: message
+            )
+
+        case .managedExternally:
+            IconRowLabel(
+                symbolName: "shippingbox",
+                symbolStyle: .secondary,
+                title: L("Updated by your package manager"),
+                caption: L("This copy of DockPin gets new versions from the package manager that installed it.")
             )
         }
     }

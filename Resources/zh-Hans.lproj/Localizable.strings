@@ -218,6 +218,7 @@
 "The saved data is damaged or was written by a different version. DockPin kept a backup copy; you can start fresh from Settings." = "保存的数据已损坏，或由其它版本写入。DockPin 已保留备份副本，你可以在设置中重新开始。";
 "The update feed couldn’t be reached. Check your internet connection and try again." = "无法访问更新源。请检查网络连接后重试。";
 "This can’t be undone." = "此操作无法撤销。";
+"This copy of DockPin gets new versions from the package manager that installed it." = "此 DockPin 副本的新版本由安装它的软件包管理器提供。";
 "This is an important update." = "这是一次重要更新。";
 "This key still does its usual job while you hold it. A function key or a right-hand modifier avoids that." = "按住它时，这个键仍会执行原本的功能。使用功能键或右侧修饰键可以避免。";
 "This update resets previous settings. Please choose your displays again." = "本次更新会重置之前的设置。请重新选择显示器。";
@@ -237,6 +238,7 @@
 "Update Available…" = "有可用更新…";
 "Update available" = "有可用更新";
 "Update ready to install" = "更新已准备就绪";
+"Updated by your package manager" = "由软件包管理器更新";
 "Updates" = "更新";
 "Updates aren’t available" = "更新不可用";
 "Use %@" = "使用%@";

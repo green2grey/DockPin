@@ -81,6 +81,16 @@ That makes `DockPin Dev`, a copy with its own settings that never checks for upd
 
 `build.sh` makes a release build and needs a Developer ID certificate; its header lists what else it expects.
 
+### Without the built-in updater
+
+Package managers that update DockPin themselves (Nix, a Homebrew formula built from source) can leave out Sparkle by setting `DOCKPIN_WITHOUT_SPARKLE` when building:
+
+```
+DOCKPIN_WITHOUT_SPARKLE=1 swift build -c release
+```
+
+That copy never checks for updates; Settings → General says the package manager updates it. Such builds are not official releases and are not signed with the maintainer's Developer ID, so after an update macOS may ask for Accessibility access again.
+
 ## What's new
 
 See the [changelog](CHANGELOG.md).

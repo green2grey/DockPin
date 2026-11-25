@@ -53,6 +53,7 @@ extension AppDelegate: SettingsActions {
             launchAtLogin: Self.launchAtLoginState,
             launchAtLoginError: launchAtLoginError,
             automaticallyChecksForUpdates: updates.automaticallyChecksForUpdates,
+            showsAutomaticUpdateToggle: UpdateController.isSparkleBuilt,
             canCheckForUpdates: updates.canCheckForUpdates,
             updateStatus: updates.status,
             lastUpdateCheck: updates.lastCheckDate,

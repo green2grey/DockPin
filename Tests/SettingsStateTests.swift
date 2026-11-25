@@ -202,6 +202,15 @@ private func state(
     }
 }
 
+@Suite struct UpdateSettingsTests {
+    /// A build without Sparkle has nothing to check automatically, so the toggle would do nothing.
+    @Test func theAutomaticCheckToggleShowsOnlyWhenSparkleIsBuiltIn() {
+        #expect(state([profile()]).showsAutomaticUpdateToggle == UpdateController.isSparkleBuilt)
+        #expect(!state([profile()]) { $0.showsAutomaticUpdateToggle = false }.showsAutomaticUpdateToggle)
+        #expect(state([profile()]) { $0.showsAutomaticUpdateToggle = true }.showsAutomaticUpdateToggle)
+    }
+}
+
 @Suite struct MenuBarIconTests {
     @Test func theIconShowsUnlessTheUserHidIt() {
         #expect(StatusItemVisibility.shouldShow(hiddenByUser: false, needsAttention: false))

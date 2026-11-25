@@ -108,6 +108,8 @@ struct SettingsState: Equatable, Sendable {
     var launchAtLogin: LaunchAtLoginState = .off
     var launchAtLoginError: String?
     var automaticallyChecksForUpdates = true
+    /// False in a build without Sparkle, where there is nothing to check automatically.
+    var showsAutomaticUpdateToggle = UpdateController.isSparkleBuilt
     var canCheckForUpdates = true
     var updateStatus: UpdateStatus = .idle
     var lastUpdateCheck: Date?
@@ -137,6 +139,7 @@ extension SettingsState {
         var launchAtLogin: LaunchAtLoginState = .off
         var launchAtLoginError: String?
         var automaticallyChecksForUpdates = true
+        var showsAutomaticUpdateToggle = UpdateController.isSparkleBuilt
         var canCheckForUpdates = true
         var updateStatus: UpdateStatus = .idle
         var lastUpdateCheck: Date?
@@ -197,6 +200,7 @@ extension SettingsState {
         launchAtLogin = inputs.launchAtLogin
         launchAtLoginError = inputs.launchAtLoginError
         automaticallyChecksForUpdates = inputs.automaticallyChecksForUpdates
+        showsAutomaticUpdateToggle = inputs.showsAutomaticUpdateToggle
         canCheckForUpdates = inputs.canCheckForUpdates
         updateStatus = inputs.updateStatus
         lastUpdateCheck = inputs.lastUpdateCheck
