@@ -124,6 +124,7 @@ cp "$BIN_PATH/$APP" "$CONTENTS/MacOS/"
 cp "$DIR/Info.plist" "$CONTENTS/"
 cp "$DIR/DockPin.icns" "$CONTENTS/Resources/"
 cp "$DIR/CHANGELOG.md" "$CONTENTS/Resources/"
+ditto "$DIR/Resources/zh-Hans.lproj" "$CONTENTS/Resources/zh-Hans.lproj"
 # ditto keeps the framework's symlinks and permissions intact; cp -R can break them.
 ditto "$BIN_PATH/Sparkle.framework" "$CONTENTS/Frameworks/Sparkle.framework"
 

@@ -233,6 +233,21 @@ private func controller(_ updater: Updater) -> UpdateController {
         updates.sessionEnded()
         #expect(updater.changes == 0)
     }
+
+    /// Only in a build without Sparkle: with Sparkle, `start()` would start the real updater.
+    @Test(.enabled(if: !UpdateController.isSparkleBuilt))
+    func withoutSparkleThePackageManagerHandlesUpdates() {
+        let updates = controller(Updater())
+        updates.start()
+        #expect(updates.status == .managedExternally)
+        #expect(!updates.canCheckForUpdates)
+        #expect(!updates.status.awaitsDecision)
+
+        // Nothing clears the explanation, and a check does nothing.
+        updates.checkForUpdates()
+        updates.sessionEnded()
+        #expect(updates.status == .managedExternally)
+    }
 }
 
 @Suite struct OverrideKeyTests {

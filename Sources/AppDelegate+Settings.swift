@@ -53,6 +53,7 @@ extension AppDelegate: SettingsActions {
             launchAtLogin: Self.launchAtLoginState,
             launchAtLoginError: launchAtLoginError,
             automaticallyChecksForUpdates: updates.automaticallyChecksForUpdates,
+            showsAutomaticUpdateToggle: UpdateController.isSparkleBuilt,
             canCheckForUpdates: updates.canCheckForUpdates,
             updateStatus: updates.status,
             lastUpdateCheck: updates.lastCheckDate,
@@ -204,7 +205,7 @@ extension AppDelegate: SettingsActions {
             }
             launchAtLoginError = nil
         } catch {
-            launchAtLoginError = "Couldn’t change the login item: \(error.localizedDescription)"
+            launchAtLoginError = L("Couldn’t change the login item: %@", error.localizedDescription)
         }
         refreshSettingsState()
     }
@@ -280,7 +281,7 @@ extension AppDelegate: SettingsActions {
     }
 
     func showHelp() {
-        textWindows.show(id: "help", title: "DockPin Help", content: HelpContent.attributedString())
+        textWindows.show(id: "help", title: L("DockPin Help"), content: HelpContent.attributedString())
     }
 
     func showWhatsNew() {
@@ -294,7 +295,7 @@ extension AppDelegate: SettingsActions {
         }
         textWindows.show(
             id: "whats-new",
-            title: "What’s New in DockPin",
+            title: L("What’s New in DockPin"),
             content: Changelog.attributedString(for: entries)
         )
     }

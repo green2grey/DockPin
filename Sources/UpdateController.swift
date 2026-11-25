@@ -1,5 +1,7 @@
 import AppKit
+#if canImport(Sparkle)
 import Sparkle
+#endif
 
 /// A found update, reduced to what the interface shows.
 struct UpdateInfo: Equatable, Sendable {
@@ -28,6 +30,8 @@ enum UpdateStatus: Equatable, Sendable {
     case failed(String)
     /// The updater itself could not start.
     case unavailable(String)
+    /// Built without Sparkle: the package manager that installed DockPin also updates it.
+    case managedExternally
 
     /// The user has a choice to make before anything else happens.
     var awaitsDecision: Bool {
@@ -59,6 +63,13 @@ enum UpdateStage: Sendable {
 /// Sparkle's callbacks into them.
 @MainActor
 final class UpdateController: NSObject {
+    /// False when DockPin was built with `DOCKPIN_WITHOUT_SPARKLE`, so a package manager updates it.
+    #if canImport(Sparkle)
+    nonisolated static let isSparkleBuilt = true
+    #else
+    nonisolated static let isSparkleBuilt = false
+    #endif
+
     private(set) var status: UpdateStatus = .idle {
         didSet { if status != oldValue { onChange?() } }
     }
@@ -72,7 +83,9 @@ final class UpdateController: NSObject {
     /// Sparkle wants the update interface in front of the user.
     var onShowInFocus: (() -> Void)?
 
+    #if canImport(Sparkle)
     private var updater: SPUUpdater?
+    #endif
     private var cancelAction: (() -> Void)?
     private var foundReply: ((UpdateChoice) -> Void)?
     private var installReply: ((UpdateChoice) -> Void)?
@@ -81,6 +94,7 @@ final class UpdateController: NSObject {
 
     // MARK: - Updater
 
+    #if canImport(Sparkle)
     func start() {
         let updater = SPUUpdater(hostBundle: .main, applicationBundle: .main, userDriver: self, delegate: nil)
         self.updater = updater
@@ -110,6 +124,24 @@ final class UpdateController: NSObject {
         guard let updater, updater.canCheckForUpdates else { return }
         updater.checkForUpdates()
     }
+    #else
+    func start() {
+        status = .managedExternally
+    }
+
+    var canCheckForUpdates: Bool { false }
+
+    var automaticallyChecksForUpdates: Bool {
+        get { false }
+        set {}
+    }
+
+    var lastCheckDate: Date? { nil }
+
+    // MARK: - What the user can do
+
+    func checkForUpdates() {}
+    #endif
 
     /// Cancels a check or a download in progress.
     func cancel() {
@@ -255,7 +287,7 @@ final class UpdateController: NSObject {
     func sessionEnded() {
         clearPendingReplies()
         switch status {
-        case .upToDate, .failed, .unavailable:
+        case .upToDate, .failed, .unavailable, .managedExternally:
             break
         default:
             status = .idle
@@ -272,6 +304,7 @@ final class UpdateController: NSObject {
 
 // MARK: - Sparkle
 
+#if canImport(Sparkle)
 extension UpdateInfo {
     init(_ item: SUAppcastItem) {
         self.init(
@@ -398,3 +431,4 @@ extension UpdateController: SPUUserDriver {
         sessionEnded()
     }
 }
+#endif

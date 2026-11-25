@@ -22,6 +22,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         window?.isVisible ?? false
     }
 
+    /// Re-applies the window title after a language change.
+    func refreshTitle() {
+        window?.title = L("DockPin Settings")
+    }
+
     func show(pane: SettingsPane? = nil) {
         if let pane { model.pane = pane }
 
@@ -58,7 +63,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "DockPin Settings"
+        window.title = L("DockPin Settings")
         // The content runs to the top edge, with the close button over the sidebar.
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true

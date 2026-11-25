@@ -87,7 +87,7 @@ enum SettingsPreviewRenderer {
 
         var waitingInputs = inputs([work, home, legacy], active: work, status: .needsAccessibility)
         waitingInputs.isAccessibilityTrusted = false
-        waitingInputs.reanchorDisabledReason = "Grant Accessibility access first"
+        waitingInputs.reanchorDisabledReason = L("Grant Accessibility access first")
 
         var offProfile = work
         offProfile.isEnabled = false
@@ -95,7 +95,7 @@ enum SettingsPreviewRenderer {
         offProfile.customOverrideKey = CustomOverrideKey(keyCode: 105, label: KeyNames.label(keyCode: 105))
         offProfile.sanitize()
         var offInputs = inputs([offProfile, home], active: offProfile, status: .disabled)
-        offInputs.reanchorDisabledReason = "Turn on pinning first"
+        offInputs.reanchorDisabledReason = L("Turn on pinning first")
 
         var pausedInputs = inputs([work, home, legacy], active: work, status: .locking)
         pausedInputs.manualHoldEnabled = true
@@ -108,6 +108,12 @@ enum SettingsPreviewRenderer {
         hiddenInputs.launchAtLogin = .needsApproval
         hiddenInputs.isAccessibilityTrusted = false
 
+        // A build without Sparkle, updated by a package manager.
+        var managedInputs = generalInputs
+        managedInputs.updateStatus = .managedExternally
+        managedInputs.showsAutomaticUpdateToggle = false
+        managedInputs.canCheckForUpdates = false
+
         func general(_ name: String, _ status: UpdateStatus) -> Scene {
             var updating = generalInputs
             updating.updateStatus = status
@@ -117,16 +123,17 @@ enum SettingsPreviewRenderer {
 
         return [
             general("8-update-idle", .idle),
-            general("9-update-up-to-date", .upToDate("DockPin 2.2 is currently the newest version available.")),
+            general("9-update-up-to-date", .upToDate(L("DockPin 2.2 is currently the newest version available."))),
             general("10-update-available", .available(UpdateInfo(version: "2.3", notes: [
-                "Hide the menu bar icon and still get back to Settings.",
-                "Custom override key: record any key, not only a modifier.",
-                "Re-anchor Dock Now works again on current versions of macOS.",
-                "Auto-switch Profiles now switches.",
+                L("Hide the menu bar icon and still get back to Settings."),
+                L("Custom override key: record any key, not only a modifier."),
+                L("Re-anchor Dock Now works again on current versions of macOS."),
+                L("Auto-switch Profiles now switches."),
             ]))),
             general("11-update-downloading", .downloading(fraction: 0.42)),
             general("12-update-ready", .readyToInstall),
-            general("13-update-failed", .failed("The update feed couldn’t be reached. Check your internet connection and try again.")),
+            general("13-update-failed", .failed(L("The update feed couldn’t be reached. Check your internet connection and try again."))),
+            Scene(name: "14-update-managed-externally", pane: .general, state: SettingsState(managedInputs)),
             Scene(name: "1-displays-pinned", pane: .displays, state: pinned),
             Scene(name: "2-displays-needs-access", pane: .displays, state: SettingsState(waitingInputs)),
             Scene(name: "3-displays-off", pane: .displays, state: SettingsState(offInputs)),
