@@ -30,7 +30,7 @@ struct DisplayEdgeReachability: Sendable {
     }
 
     var blockedReason: String {
-        "\"\(descriptor.localizedName)\" can’t host the Dock on \(edge.label.lowercased()) because \(edge.blockedDirectionDescription)."
+        L("\"%@\" can’t host the Dock on %@ because %@.", descriptor.localizedName, edge.nameInSentence, edge.blockedDirectionDescription)
     }
 
     var preferredAppKitPoint: CGPoint? {

@@ -11,9 +11,9 @@ enum SettingsPane: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .displays: return "Displays"
-        case .profiles: return "Profiles"
-        case .general: return "General"
+        case .displays: return L("Displays")
+        case .profiles: return L("Profiles")
+        case .general: return L("General")
         }
     }
 
@@ -49,9 +49,9 @@ struct DisplayRow: Identifiable, Equatable, Sendable {
     var canDisallow: Bool
 
     var caption: String? {
-        if !isConnected { return "Not connected" }
+        if !isConnected { return L("Not connected") }
         if let blockedReason { return blockedReason }
-        if hasDock { return "The Dock is here now" }
+        if hasDock { return L("The Dock is here now") }
         return nil
     }
 }
@@ -228,7 +228,7 @@ extension SettingsState {
                 hasDock: dockDisplay == display.displayID,
                 blockedReason: isReachable
                     ? nil
-                    : "Can’t host the Dock on the \(dockEdge.rawValue): \(dockEdge.blockedDirectionDescription)",
+                    : L("Can’t host the Dock on the %@: %@", dockEdge.nameInSentence, dockEdge.blockedDirectionDescription),
                 // Turning this display off removes every stored ID that covers it.
                 canDisallow: allowed.count - covering.count >= 1
             )
@@ -242,7 +242,7 @@ extension SettingsState {
             DisplayRow(
                 id: "missing-\(stored.storageKey)",
                 stableID: stored,
-                name: displayNames[stored.storageKey] ?? "Unknown display",
+                name: displayNames[stored.storageKey] ?? L("Unknown display"),
                 isBuiltIn: false,
                 isConnected: false,
                 isAllowed: true,
@@ -256,40 +256,40 @@ extension SettingsState {
 
     private static func listed(_ names: [String]) -> String {
         switch names.count {
-        case 0: return "the allowed display"
+        case 0: return L("the allowed display")
         case 1: return names[0]
-        case 2: return "\(names[0]) and \(names[1])"
-        default: return "\(names.count) displays"
+        case 2: return L("%@ and %@", names[0], names[1])
+        default: return L("%@ displays", String(names.count))
         }
     }
 
     static func statusDetail(_ status: LockStatus, pinnedTo names: [String], dockEdge: DockEdge) -> String {
         switch status {
         case .notConfigured:
-            return "DockPin isn’t set up yet."
+            return L("DockPin isn’t set up yet.")
         case .disabled:
-            return "Off. The Dock can move to any display."
+            return L("Off. The Dock can move to any display.")
         case .locking:
-            return "Keeping the Dock on \(listed(names))."
+            return L("Keeping the Dock on %@.", listed(names))
         case .needsAccessibility:
-            return "Waiting for Accessibility access."
+            return L("Waiting for Accessibility access.")
         case .separateSpacesOff:
-            return "“Displays have separate Spaces” is off, so macOS keeps the Dock on the main display."
+            return L("“Displays have separate Spaces” is off, so macOS keeps the Dock on the main display.")
         case .allowedDisplayMissing:
-            return "Idle. None of the allowed displays is connected."
+            return L("Idle. None of the allowed displays is connected.")
         case .edgeBlocked:
-            return "Idle. No allowed display has a free \(dockEdge.rawValue) edge in this arrangement."
+            return L("Idle. No allowed display has a free %@ edge in this arrangement.", dockEdge.nameInSentence)
         case .tapUnavailable:
-            return "Couldn’t start. Try quitting and reopening DockPin."
+            return L("Couldn’t start. Try quitting and reopening DockPin.")
         }
     }
 
     static func menuStatus(_ status: LockStatus, pinnedTo names: [String], dockEdge: DockEdge) -> String {
         switch status {
-        case .notConfigured: return "DockPin isn’t set up"
-        case .disabled: return "DockPin is off"
-        case .locking: return "Pinned to \(listed(names))"
-        default: return status.explanation(dockEdge: dockEdge) ?? "DockPin is idle"
+        case .notConfigured: return L("DockPin isn’t set up")
+        case .disabled: return L("DockPin is off")
+        case .locking: return L("Pinned to %@", listed(names))
+        default: return status.explanation(dockEdge: dockEdge) ?? L("DockPin is idle")
         }
     }
 
@@ -300,29 +300,32 @@ extension SettingsState {
         dockEdge: DockEdge,
         hasSeparateSpaces: Bool
     ) -> String? {
-        guard let active else { return "Set up DockPin first." }
+        guard let active else { return L("Set up DockPin first.") }
         if active.isEnabled { return nil }
         if !hasSeparateSpaces {
-            return "Turn on “Displays have separate Spaces” in System Settings → Desktop & Dock, then log out and back in."
+            return L("Turn on “Displays have separate Spaces” in System Settings → Desktop & Dock, then log out and back in.")
         }
-        if connected.count < 2 { return "Connect a second display to use DockPin." }
+        if connected.count < 2 { return L("Connect a second display to use DockPin.") }
 
         let allowedConnected = connected.filter { active.allows($0.stableID) }
-        if allowedConnected.isEmpty { return "Allow at least one connected display first." }
+        if allowedConnected.isEmpty { return L("Allow at least one connected display first.") }
         if !allowedConnected.contains(where: { reachability[$0.displayID]?.isReachable == true }) {
-            return "No allowed display has a free \(dockEdge.rawValue) edge in this arrangement."
+            return L("No allowed display has a free %@ edge in this arrangement.", dockEdge.nameInSentence)
         }
         return nil
     }
 
     private static func triggerSummary(_ profile: DockProfile, displayNames: [String: String]) -> String {
         guard let requirements = profile.triggerRequirements, !requirements.isEmpty else {
-            return "Not linked to any displays"
+            return L("Not linked to any displays")
         }
         let names = requirements.keys
             .sorted { $0.storageKey < $1.storageKey }
-            .map { displayNames[$0.storageKey] ?? "an unknown display" }
-        return "Linked to " + ListFormatter.localizedString(byJoining: names)
+            .map { displayNames[$0.storageKey] ?? L("an unknown display") }
+        let formatter = ListFormatter()
+        formatter.locale = Localization.shared.locale
+        let joined = formatter.string(from: names) ?? names.joined(separator: ", ")
+        return L("Linked to ") + joined
     }
 }
 

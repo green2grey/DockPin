@@ -9,6 +9,11 @@ if let flag = CommandLine.arguments.firstIndex(of: "--render-settings"),
    CommandLine.arguments.count > flag + 1 {
     let directory = URL(fileURLWithPath: CommandLine.arguments[flag + 1], isDirectory: true)
     let light = CommandLine.arguments.contains("--light")
+    if let index = CommandLine.arguments.firstIndex(of: "--language"),
+       CommandLine.arguments.count > index + 1,
+       let language = AppLanguage(rawValue: CommandLine.arguments[index + 1]) {
+        Localization.shared.preference = language
+    }
     MainActor.assumeIsolated {
         SettingsPreviewRenderer.render(to: directory, appearance: light ? .aqua : .darkAqua)
     }

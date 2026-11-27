@@ -22,15 +22,15 @@ struct ProfilesPane: View {
                         beginRenaming(id: id, currentName: model.state.profiles.first { $0.id == id }?.name ?? "")
                     }
                 } label: {
-                    Label("New Profile", systemImage: "plus")
+                    Label(L("New Profile"), systemImage: "plus")
                         .foregroundStyle(state.hasProfile ? Color.accentColor : Color.secondary)
                 }
                 .buttonStyle(.borderless)
                 .disabled(!state.hasProfile)
             } header: {
-                Text("Profiles")
+                Text(L("Profiles"))
             } footer: {
-                SectionFootnote("A new profile starts as a copy of the one in use, linked to the displays connected right now.")
+                SectionFootnote(L("A new profile starts as a copy of the one in use, linked to the displays connected right now."))
             }
 
             Section {
@@ -39,18 +39,18 @@ struct ProfilesPane: View {
                     set: { model.actions?.setAutoSwitch($0) }
                 )) {
                     RowLabel(
-                        title: "Switch profiles automatically",
-                        caption: "When your displays change, DockPin switches to the profile linked to the ones that are connected."
+                        title: L("Switch profiles automatically"),
+                        caption: L("When your displays change, DockPin switches to the profile linked to the ones that are connected.")
                     )
                 }
 
                 if state.autoSwitchPaused {
                     LabeledContent {
-                        Button("Resume") { model.actions?.resumeAutoSwitching() }
+                        Button(L("Resume")) { model.actions?.resumeAutoSwitching() }
                     } label: {
                         RowLabel(
-                            title: "Paused",
-                            caption: "You chose a profile by hand, so DockPin is leaving it alone."
+                            title: L("Paused"),
+                            caption: L("You chose a profile by hand, so DockPin is leaving it alone.")
                         )
                     }
                 }
@@ -58,14 +58,14 @@ struct ProfilesPane: View {
         }
         .formStyle(.grouped)
         .confirmationDialog(
-            "Delete “\(pendingDelete?.name ?? "")”?",
+            L("Delete “%@”?", pendingDelete?.name ?? ""),
             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
             presenting: pendingDelete
         ) { profile in
-            Button("Delete", role: .destructive) { model.actions?.deleteProfile(profile.id) }
-            Button("Cancel", role: .cancel) {}
+            Button(L("Delete"), role: .destructive) { model.actions?.deleteProfile(profile.id) }
+            Button(L("Cancel"), role: .cancel) {}
         } message: { _ in
-            Text("This can’t be undone.")
+            Text(L("This can’t be undone."))
         }
     }
 
@@ -80,12 +80,12 @@ struct ProfilesPane: View {
                     .foregroundStyle(profile.isActive ? Color.accentColor : Color.secondary)
             }
             .buttonStyle(.plain)
-            .help(profile.isActive ? "In use" : "Use this profile")
-            .accessibilityLabel(profile.isActive ? "\(profile.name), in use" : "Use \(profile.name)")
+            .help(profile.isActive ? L("In use") : L("Use this profile"))
+            .accessibilityLabel(profile.isActive ? L("%@, in use", profile.name) : L("Use %@", profile.name))
 
             VStack(alignment: .leading, spacing: 2) {
                 if renamingID == profile.id {
-                    TextField("Profile name", text: $draftName)
+                    TextField(L("Profile name"), text: $draftName)
                         .textFieldStyle(.roundedBorder)
                         .labelsHidden()
                         .focused($nameFieldFocused)
@@ -102,13 +102,13 @@ struct ProfilesPane: View {
             Spacer(minLength: 8)
 
             if renamingID == profile.id {
-                Button("Done") { commitRename() }
+                Button(L("Done")) { commitRename() }
             } else {
                 Menu {
-                    Button("Rename…") { beginRenaming(id: profile.id, currentName: profile.name) }
-                    Button("Link to Current Displays") { model.actions?.linkProfileToCurrentDisplays(profile.id) }
+                    Button(L("Rename…")) { beginRenaming(id: profile.id, currentName: profile.name) }
+                    Button(L("Link to Current Displays")) { model.actions?.linkProfileToCurrentDisplays(profile.id) }
                     Divider()
-                    Button("Delete…", role: .destructive) { pendingDelete = profile }
+                    Button(L("Delete…"), role: .destructive) { pendingDelete = profile }
                         .disabled(state.profiles.count < 2)
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -117,7 +117,7 @@ struct ProfilesPane: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
-                .accessibilityLabel("Options for \(profile.name)")
+                .accessibilityLabel(L("Options for %@", profile.name))
             }
         }
     }

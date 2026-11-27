@@ -5,6 +5,7 @@ import SwiftUI
 /// under a header that carries the profile switcher.
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
+    @ObservedObject private var localization = Localization.shared
 
     static let size = CGSize(width: 780, height: 580)
     static let sidebarWidth: CGFloat = 210
@@ -33,6 +34,8 @@ struct SettingsView: View {
         .frame(minWidth: Self.size.width, maxWidth: Self.size.width,
                minHeight: Self.size.height, maxHeight: .infinity)
         .ignoresSafeArea(.container, edges: .top)
+        // Redraw from scratch when the language changes, so every label is rebuilt.
+        .id(localization.resolved)
     }
 }
 
@@ -135,7 +138,7 @@ private struct ProfileSwitcher: View {
                 }
             }
             Divider()
-            Button("Manage Profiles…") { model.pane = .profiles }
+            Button(L("Manage Profiles…")) { model.pane = .profiles }
         } label: {
             Text(model.state.activeProfileName)
                 .font(.system(size: 13, weight: .medium))
@@ -146,8 +149,8 @@ private struct ProfileSwitcher: View {
         .padding(.vertical, 6)
         .background(Capsule().fill(Color.primary.opacity(0.07)))
         .overlay(Capsule().strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
-        .help("The profile in use")
-        .accessibilityLabel("Profile: \(model.state.activeProfileName)")
+        .help(L("The profile in use"))
+        .accessibilityLabel(L("Profile: %@", model.state.activeProfileName))
     }
 }
 

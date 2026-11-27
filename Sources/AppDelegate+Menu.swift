@@ -35,23 +35,23 @@ extension AppDelegate {
         case .notConfigured:
             symbol = "pin.slash"
             fallback = "lock.open"
-            tooltip = "DockPin — Not set up"
+            tooltip = L("DockPin — Not set up")
         case .disabled:
             symbol = "pin"
             fallback = "lock"
-            tooltip = "DockPin — Off"
+            tooltip = L("DockPin — Off")
         case .locking:
             symbol = "pin.fill"
             fallback = "lock.fill"
-            tooltip = "DockPin — \(profileName)"
+            tooltip = L("DockPin — %@", profileName)
         case .needsAccessibility, .tapUnavailable:
             symbol = "exclamationmark.triangle"
             fallback = "lock.slash"
-            tooltip = "DockPin — \(lockStatus.explanation(dockEdge: DockEdge.current()) ?? "Not running")"
+            tooltip = L("DockPin — %@", lockStatus.explanation(dockEdge: DockEdge.current()) ?? L("Not running"))
         case .separateSpacesOff, .allowedDisplayMissing, .edgeBlocked:
             symbol = "pin"
             fallback = "lock"
-            tooltip = "DockPin — \(profileName) (\(lockStatus.explanation(dockEdge: DockEdge.current()) ?? "idle"))"
+            tooltip = L("DockPin — %@ (%@)", profileName, lockStatus.explanation(dockEdge: DockEdge.current()) ?? L("idle"))
         }
 
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: tooltip)
@@ -69,7 +69,7 @@ extension AppDelegate {
         // ── What DockPin is doing ──
         if state.lockStatus == .needsAccessibility {
             let grant = NSMenuItem(
-                title: "\(state.menuStatus) — Open System Settings…",
+                title: L("%@ — Open System Settings…", state.menuStatus),
                 action: #selector(openAccessibilitySettingsFromMenu),
                 keyEquivalent: ""
             )
@@ -84,7 +84,7 @@ extension AppDelegate {
         }
 
         if state.updateStatus.awaitsDecision {
-            let update = NSMenuItem(title: "Update Available…", action: #selector(openUpdatesFromMenu), keyEquivalent: "")
+            let update = NSMenuItem(title: L("Update Available…"), action: #selector(openUpdatesFromMenu), keyEquivalent: "")
             update.target = self
             update.image = Self.updateIcon
             menu.addItem(update)
@@ -94,7 +94,7 @@ extension AppDelegate {
 
         if state.hasProfile {
             // ── Everyday actions ──
-            let pin = NSMenuItem(title: "Pin the Dock", action: #selector(togglePinningFromMenu), keyEquivalent: "e")
+            let pin = NSMenuItem(title: L("Pin the Dock"), action: #selector(togglePinningFromMenu), keyEquivalent: "e")
             pin.keyEquivalentModifierMask = [.command]
             pin.target = self
             pin.state = state.pinningEnabled ? .on : .off
@@ -102,14 +102,14 @@ extension AppDelegate {
             pin.toolTip = state.pinningEnabled ? nil : state.enableBlockedReason
             menu.addItem(pin)
 
-            let reanchor = NSMenuItem(title: "Re-anchor Dock Now", action: #selector(reanchorFromMenu), keyEquivalent: "")
+            let reanchor = NSMenuItem(title: L("Re-anchor Dock Now"), action: #selector(reanchorFromMenu), keyEquivalent: "")
             reanchor.target = self
             reanchor.isEnabled = state.reanchorDisabledReason == nil
             reanchor.toolTip = state.reanchorDisabledReason
             menu.addItem(reanchor)
 
             if state.profiles.count > 1 {
-                let profileItem = NSMenuItem(title: "Profile", action: nil, keyEquivalent: "")
+                let profileItem = NSMenuItem(title: L("Profile"), action: nil, keyEquivalent: "")
                 let profileMenu = NSMenu()
                 for profile in state.profiles {
                     let item = NSMenuItem(title: profile.name, action: #selector(selectProfileFromMenu(_:)), keyEquivalent: "")
@@ -120,7 +120,7 @@ extension AppDelegate {
                 }
                 if state.autoSwitchPaused {
                     profileMenu.addItem(.separator())
-                    let resume = NSMenuItem(title: "Resume Auto-switching", action: #selector(resumeAutoSwitchingFromMenu), keyEquivalent: "")
+                    let resume = NSMenuItem(title: L("Resume Auto-switching"), action: #selector(resumeAutoSwitchingFromMenu), keyEquivalent: "")
                     resume.target = self
                     profileMenu.addItem(resume)
                 }
@@ -133,7 +133,7 @@ extension AppDelegate {
 
         // ── Settings and Quit ──
         let settings = NSMenuItem(
-            title: state.hasProfile ? "DockPin Settings…" : "Set Up DockPin…",
+            title: state.hasProfile ? L("DockPin Settings…") : L("Set Up DockPin…"),
             action: #selector(openSettingsFromMenu),
             keyEquivalent: ","
         )
@@ -141,23 +141,23 @@ extension AppDelegate {
         settings.target = self
         menu.addItem(settings)
 
-        let quit = NSMenuItem(title: "Quit DockPin", action: #selector(quitFromMenu), keyEquivalent: "q")
+        let quit = NSMenuItem(title: L("Quit DockPin"), action: #selector(quitFromMenu), keyEquivalent: "q")
         quit.keyEquivalentModifierMask = [.command]
         quit.target = self
         menu.addItem(quit)
     }
 
-    private static let warningIcon: NSImage? = {
-        let image = NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: "Needs attention")
+    private static var warningIcon: NSImage? {
+        let image = NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: L("Needs attention"))
         image?.isTemplate = true
         return image
-    }()
+    }
 
-    private static let updateIcon: NSImage? = {
-        let image = NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: "Update available")
+    private static var updateIcon: NSImage? {
+        let image = NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: L("Update available"))
         image?.isTemplate = true
         return image
-    }()
+    }
 
     // MARK: - Menu actions
 
