@@ -109,7 +109,7 @@ extension AppDelegate {
             menu.addItem(reanchor)
 
             if state.profiles.count > 1 {
-                let profileItem = NSMenuItem(title: "Profile", action: nil, keyEquivalent: "")
+                let profileItem = NSMenuItem(title: L("Profile"), action: nil, keyEquivalent: "")
                 let profileMenu = NSMenu()
                 for profile in state.profiles {
                     let item = NSMenuItem(title: profile.name, action: #selector(selectProfileFromMenu(_:)), keyEquivalent: "")

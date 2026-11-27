@@ -18,7 +18,7 @@
 "Auto-switch Profiles now switches." = "自动切换配置现在真的会切换了。";
 "Auto-switching" = "自动切换";
 "Automatic follows the language your Mac uses." = "自动跟随 Mac 的系统语言。";
-"Bottom" = "底";
+"Bottom" = "底部";
 "Brings the Dock back to the allowed display by briefly moving the pointer to its edge." = "短暂把指针移到允许显示器的边缘，从而把程序坞拉回来。";
 "Cancel" = "取消";
 "Caps Lock (⇪)" = "Caps Lock（⇪）";
@@ -130,7 +130,7 @@
 "Launch at Login" = "登录时启动";
 "Launch at login" = "登录时启动";
 "Learn More…" = "了解更多…";
-"Left" = "左";
+"Left" = "左侧";
 "Left Arrow (←)" = "左方向键（←）";
 "Left Command (⌘)" = "左侧 Command（⌘）";
 "Left Control (⌃)" = "左侧 Control（⌃）";
@@ -171,6 +171,7 @@
 "Press a key…" = "请按键…";
 "Press the key to use, or Escape to cancel." = "按下要用的按键，或按 Escape 取消。";
 "Profile 2" = "配置 2";
+"Profile" = "配置";
 "Profile name" = "配置名称";
 "Profile: %@" = "配置：%@";
 "Profiles" = "配置";
@@ -190,7 +191,7 @@
 "Resume" = "继续";
 "Resume Auto-switching" = "恢复自动切换";
 "Return (↩)" = "Return（↩）";
-"Right" = "右";
+"Right" = "右侧";
 "Right Arrow (→)" = "右方向键（→）";
 "Right Command (⌘)" = "右侧 Command（⌘）";
 "Right Control (⌃)" = "右侧 Control（⌃）";
